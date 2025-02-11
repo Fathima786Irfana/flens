@@ -1,0 +1,9 @@
+NODE_TLS_REJECT_UNAUTHORIZED=0
+GITHUB_USER=<user_name>
+GITHUB_TOKEN=<PAT_Token>
+
+SITE_1_URL=https://one.docker.localhost
+SITE_1_KEY=<API_KEY_1>
+
+SITE_2_URL=https://two.docker.localhost
+SITE_2_KEY=<API_KEY_2>

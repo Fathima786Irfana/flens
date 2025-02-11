@@ -1,0 +1,31 @@
+{
+  "name": "flens",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "A CLI Tool created bt Fathima (Fathima + LENS = flens)",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "bin": {
+    "flens": "./bin/setup.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Fathima786Irfana/flens.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Fathima786Irfana/flens/issues"
+  },
+  "homepage": "https://github.com/Fathima786Irfana/flens#readme",
+  "dependencies": {
+    "commander": "^13.1.0",
+    "dotenv": "^16.4.7",
+    "node-fetch": "^3.3.2",
+    "open": "^10.1.0",
+    "os": "^0.1.2"
+  }
+}
