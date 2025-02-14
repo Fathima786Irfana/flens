@@ -1,0 +1,1 @@
+{"root":["./src/index.ts","./src/commands/hello/index.ts","./src/commands/hello/world.ts","./src/commands/project/clear-use.ts","./src/commands/project/create.ts","./src/commands/project/delete.ts","./src/commands/project/edit.ts","./src/commands/project/list.ts","./src/commands/project/use.ts","./src/commands/repo/hygiene.ts","./src/commands/repo/init.ts"],"version":"5.7.3"}
