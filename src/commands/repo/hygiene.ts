@@ -26,7 +26,7 @@ function getActiveProject(): ProjectConfig {
 function ensureDirectoryExists(dirPath: string): void {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
-    console.log(`📁 Created directory: ${dirPath}`);
+    // console.log(`📁 Created directory: ${dirPath}`);
   }
 }
 
@@ -322,7 +322,9 @@ export default class RepoHygieneCommand extends Command {
       console.error('❌ Error:', error);
     }
     try {
-      const gitStatus = execSync('git status --porcelain', { cwd: repoPath }).toString().trim();
+      // Stage files first to get proper status
+      execSync('git add .', { cwd: repoPath });
+      const gitStatus = execSync('git status --porcelain=v1', { cwd: repoPath }).toString().trim();
       
       if (gitStatus) {
         const { sync } = await inquirer.prompt([
@@ -333,11 +335,48 @@ export default class RepoHygieneCommand extends Command {
             choices: ['Yes', 'No'],
           },
         ]);
-        
         if (sync === 'Yes') {
-          this.log('Waiting for sync...');
+          // Process the git status output and create changelog.txt
+          const changeLog: string[] = [];
+          const statusLines = gitStatus.split('\n');
+
+          statusLines.forEach((line) => {
+            const statusCode = line.substring(0, 2).trim(); // Git status code
+            const filePath = line.substring(3).trim(); // File path
+
+            let state = '';
+            if (statusCode === 'A') state = 'INSERT';
+            else if (statusCode === 'M') state = 'UPDATE';
+            else if (statusCode === 'D') state = 'DELETE';
+            else if (statusCode === 'R') state = 'RENAME';
+            else if (statusCode === '??') state = 'UNTRACKED';
+
+            if (state) {
+              changeLog.push(`${filePath.padEnd(50)} ${state}`);
+            }
+          });
+
+          // Define the log directory and file path
+          const logDir = path.join(repoPath, 'log');
+          const logFile = path.join(logDir, 'changelog.txt');
+
+          // Ensure the log directory exists
+          if (!fs.existsSync(logDir)) {
+            fs.mkdirSync(logDir, { recursive: true });
+          }
+
+          // Write the changelog file
+          fs.writeFileSync(logFile, changeLog.join('\n'), 'utf-8');
+
+          this.log(`Changelog created at: ${logFile}`);
         } else {
-          this.log('No sync is done.');
+          this.log('No sync is done. Discarding all changes...');
+          // Discard all changes
+          execSync('git restore --staged .', { cwd: repoPath }); // Unstage
+          execSync('git checkout -- .', { cwd: repoPath }); // Revert modified files
+          execSync('git clean -df', { cwd: repoPath }); // Remove untracked files
+
+          this.log('All changes discarded.');
         }
       } else {
         this.log(`No change is detected. Your Instance is in sync with IDE.`);
