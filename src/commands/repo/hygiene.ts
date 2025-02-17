@@ -2,6 +2,8 @@ import { Command, Flags } from '@oclif/core';
 import fs from 'fs';
 import path from 'path';
 import fetch, { RequestInit } from 'node-fetch';
+import { execSync } from 'child_process';
+import inquirer from 'inquirer';
 
 interface ProjectConfig {
   siteName: string;
@@ -83,7 +85,6 @@ async function processPropertySetter(data: any, repoPath: string): Promise<void>
 
 async function processCustomField(data: any, repoPath: string): Promise<void> {
   const groupedByDoctype: Record<string, any[]> = {};
-
   data.data.forEach((item: any) => {
     const doctype = item.dt;
     if (!groupedByDoctype[doctype]) groupedByDoctype[doctype] = [];
@@ -92,6 +93,8 @@ async function processCustomField(data: any, repoPath: string): Promise<void> {
   });
 
   Object.keys(groupedByDoctype).forEach((doctype) => {
+    const folderPath = path.join(repoPath, 'customField');
+    ensureDirectoryExists(folderPath);
     const filePath = path.join(repoPath, 'customField', `${doctype}.json`);
     fs.writeFileSync(filePath, JSON.stringify(groupedByDoctype[doctype], null, 2));
   });
@@ -286,6 +289,7 @@ export default class RepoHygieneCommand extends Command {
     const homeDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
     const repoPath = path.join(homeDir, 'repositories', repoName);
     ensureDirectoryExists(repoPath);
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
     
     const headers = new Headers({ Authorization: key });
     const requestOptions: RequestInit = { method: 'GET', headers, redirect: 'follow' };
@@ -317,7 +321,29 @@ export default class RepoHygieneCommand extends Command {
     } catch (error) {
       console.error('❌ Error:', error);
     }
-
-    console.log('🎉 Repo hygiene completed successfully!');
+    try {
+      const gitStatus = execSync('git status --porcelain', { cwd: repoPath }).toString().trim();
+      
+      if (gitStatus) {
+        const { sync } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'sync',
+            message: `Your IDE is not in sync with your ${siteName}. Do you want to sync your ${siteName}?`,
+            choices: ['Yes', 'No'],
+          },
+        ]);
+        
+        if (sync === 'Yes') {
+          this.log('Waiting for sync...');
+        } else {
+          this.log('No sync is done.');
+        }
+      } else {
+        this.log(`No change is detected. Your Instance is in sync with IDE.`);
+      } 
+    } catch (error) {
+      this.log(`Error checking Git status for ${siteName}: ${(error as Error).message}`);
+    }
   }
 }
