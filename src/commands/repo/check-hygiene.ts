@@ -331,44 +331,89 @@ export default class RepoHygieneCommand extends Command {
           {
             type: 'list',
             name: 'sync',
-            message: `Your IDE is not in sync with your ${siteName}. Do you want to sync your ${siteName}?`,
+            message: `Your Host and Repo is not in sync. Do you want to sync ?.`,
             choices: ['Yes', 'No'],
           },
         ]);
         if (sync === 'Yes') {
-          // Process the git status output and create changelog.txt
-          const changeLog: string[] = [];
-          const statusLines = gitStatus.split('\n');
+          const { syncOption } = await inquirer.prompt([
+            {
+              type: 'list',
+              name: 'syncOption',
+              message: `Choose any option for syncing.`,
+              choices: ['Repo to Host', 'Host to Repo'],
+            },
+          ]);
+          if (syncOption === 'Repo to Host') {
+            // Process the git status output and create changelog.txt
+            const changeLog: string[] = [];
+            const statusLines = gitStatus.split('\n');
 
-          statusLines.forEach((line) => {
-            const statusCode = line.substring(0, 2).trim(); // Git status code
-            const filePath = line.substring(3).trim(); // File path
+            statusLines.forEach((line) => {
+              const statusCode = line.substring(0, 2).trim(); // Git status code
+              const filePath = line.substring(3).trim(); // File path
 
-            let state = '';
-            if (statusCode === 'A') state = 'INSERT';
-            else if (statusCode === 'M') state = 'UPDATE';
-            else if (statusCode === 'D') state = 'DELETE';
-            else if (statusCode === 'R') state = 'RENAME';
-            else if (statusCode === '??') state = 'UNTRACKED';
+              let state = '';
+              if (statusCode === 'A') state = 'INSERT';
+              else if (statusCode === 'M') state = 'UPDATE';
+              else if (statusCode === 'D') state = 'DELETE';
+              else if (statusCode === 'R') state = 'RENAME';
+              else if (statusCode === '??') state = 'UNTRACKED';
 
-            if (state) {
-              changeLog.push(`${filePath.padEnd(50)} ${state}`);
+              if (state) {
+                changeLog.push(`${filePath.padEnd(50)} ${state}`);
+              }
+            });
+
+            // Define the log directory and file path
+            const logDir = path.join(repoPath, 'log');
+            const logFile = path.join(logDir, 'changelog.txt');
+
+            // Ensure the log directory exists
+            if (!fs.existsSync(logDir)) {
+              fs.mkdirSync(logDir, { recursive: true });
             }
-          });
 
-          // Define the log directory and file path
-          const logDir = path.join(repoPath, 'log');
-          const logFile = path.join(logDir, 'changelog.txt');
+            // Write the changelog file
+            fs.writeFileSync(logFile, changeLog.join('\n'), 'utf-8');
 
-          // Ensure the log directory exists
-          if (!fs.existsSync(logDir)) {
-            fs.mkdirSync(logDir, { recursive: true });
+            this.log(`Changelog created at: ${logFile}`);
+            this.log(`Use flens repo sync command to proceed.`)
+          } else {
+             // Process the git status output and create changelog.txt
+             const changeLog: string[] = [];
+             const statusLines = gitStatus.split('\n');
+ 
+             statusLines.forEach((line) => {
+               const statusCode = line.substring(0, 2).trim(); // Git status code
+               const filePath = line.substring(3).trim(); // File path
+ 
+               let state = '';
+               if (statusCode === 'A') state = 'INSERT';
+               else if (statusCode === 'M') state = 'UPDATE';
+               else if (statusCode === 'D') state = 'DELETE';
+               else if (statusCode === 'R') state = 'RENAME';
+               else if (statusCode === '??') state = 'UNTRACKED';
+ 
+               if (state) {
+                 changeLog.push(`${filePath.padEnd(50)} ${state}`);
+               }
+             });
+ 
+             // Define the log directory and file path
+             const logDir = path.join(repoPath, 'log');
+             const logFile = path.join(logDir, 'changelog.txt');
+ 
+             // Ensure the log directory exists
+             if (!fs.existsSync(logDir)) {
+               fs.mkdirSync(logDir, { recursive: true });
+             }
+ 
+             // Write the changelog file
+             fs.writeFileSync(logFile, changeLog.join('\n'), 'utf-8');
+             execSync('git add .', { cwd: repoPath });
+             this.log(`The changes are staged in the repo. Create a new commit to proceed.`)
           }
-
-          // Write the changelog file
-          fs.writeFileSync(logFile, changeLog.join('\n'), 'utf-8');
-
-          this.log(`Changelog created at: ${logFile}`);
         } else {
           this.log('No sync is done. Discarding all changes...');
           // Discard all changes

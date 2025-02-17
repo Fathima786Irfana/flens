@@ -56,7 +56,7 @@ export default class Edit extends Command {
         default: projectData.siteName
       },
       {
-        type: 'input',
+        type: 'password',
         name: 'key',
         message: 'Key:',
         default: projectData.key
@@ -74,7 +74,7 @@ export default class Edit extends Command {
         default: projectData.gitUsername
       },
       {
-        type: 'input',
+        type: 'password',
         name: 'gitToken',
         message: 'Git Token:',
         default: projectData.gitToken
