@@ -19,8 +19,8 @@ export default class ClearUse extends Command {
     const projectName = projectData.activeProject
 
     this.log(`🔹 Current active project: ${projectName}`)
-    this.log('Project Details:')
-    console.log(JSON.stringify(projectData, null, 2)) // Pretty print project details
+    // this.log('Project Details:')
+    // console.log(JSON.stringify(projectData, null, 2)) // Pretty print project details
 
     // Ask for confirmation before deleting
     const { confirmDelete } = await inquirer.prompt([
