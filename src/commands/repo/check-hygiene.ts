@@ -26,7 +26,6 @@ function getActiveProject(): ProjectConfig {
 function ensureDirectoryExists(dirPath: string): void {
   if (!fs.existsSync(dirPath)) {
     fs.mkdirSync(dirPath, { recursive: true });
-    // console.log(`📁 Created directory: ${dirPath}`);
   }
 }
 
@@ -38,240 +37,138 @@ async function fetchData(url: string, requestOptions: RequestInit): Promise<any>
   return response.json();
 }
 
-async function processClientScript(data: any, repoPath: string): Promise<void> {
-  data.data.forEach((documentDetails: any) => {
-    const folderName = documentDetails.dt;
-    const folderPath = path.join(repoPath, 'clientScript', folderName);
-    ensureDirectoryExists(folderPath);
-    
-    const metaFileName = path.join(folderPath, `${documentDetails.name}.meta`);
-    const scriptFileName = path.join(folderPath, `${documentDetails.name}.js`);
+async function processWrite(data: any, repoPath: string, siteName: string, requestOptions: any, resource: string): Promise<void> {
+  if (resource === 'client_script' || resource === 'server_script') {
 
-    fs.writeFileSync(metaFileName, JSON.stringify({ ...documentDetails, script: undefined }, null, 2));
-    fs.writeFileSync(scriptFileName, documentDetails.script);
-  });
-}
+    data.data.forEach((documentDetails: any) => {
+      if ( resource === 'server_script' &&  documentDetails.script_type === 'API' ) {
+        const rootFolder = path.join(repoPath, 'api');
+        ensureDirectoryExists(rootFolder);
+        const folderName = documentDetails.name.toLowerCase().replace(/\s+/g, '_');
+        const folderPath = path.join(rootFolder, folderName);
+        ensureDirectoryExists(folderPath);
 
-async function processServerScript(data: any, repoPath: string): Promise<void> {
-  data.data.forEach((documentDetails: any) => {
-    const folderName = documentDetails.script_type;
-    const folderPath = path.join(repoPath, 'serverScript', folderName);
-    ensureDirectoryExists(folderPath);
-    
-    const metaFileName = path.join(folderPath, `${documentDetails.name}.meta`);
-    const scriptFileName = path.join(folderPath, `${documentDetails.name}.py`);
+        const scriptFileName = path.join(folderPath, `${documentDetails.name}.py`);
+        if (documentDetails.script) { 
+          fs.writeFileSync(scriptFileName, documentDetails.script || '');
+        }
 
-    fs.writeFileSync(metaFileName, JSON.stringify({ ...documentDetails, script: undefined }, null, 2));
-    fs.writeFileSync(scriptFileName, documentDetails.script);
-  });
-}
-
-async function processPropertySetter(data: any, repoPath: string): Promise<void> {
-  data.data.forEach((documentDetails: any) => {
-    const folderName = documentDetails.doc_type;
-    const folderPath = path.join(repoPath, 'propertySetter', folderName);
-    ensureDirectoryExists(folderPath);
-    
-    const metaFileName = path.join(folderPath, `${documentDetails.name}.json`);
-    const filteredData = { ...documentDetails };
-    delete filteredData.owner;
-    delete filteredData.creation;
-    delete filteredData.modified;
-    delete filteredData.modified_by;
-
-    fs.writeFileSync(metaFileName, JSON.stringify(filteredData, null, 2));
-  });
-}
-
-async function processCustomField(data: any, repoPath: string): Promise<void> {
-  const groupedByDoctype: Record<string, any[]> = {};
-  data.data.forEach((item: any) => {
-    const doctype = item.dt;
-    if (!groupedByDoctype[doctype]) groupedByDoctype[doctype] = [];
-    const { modified, modified_by, owner, creation, ...filteredItem } = item;
-    groupedByDoctype[doctype].push(filteredItem);
-  });
-
-  Object.keys(groupedByDoctype).forEach((doctype) => {
-    const folderPath = path.join(repoPath, 'customField');
-    ensureDirectoryExists(folderPath);
-    const filePath = path.join(repoPath, 'customField', `${doctype}.json`);
-    fs.writeFileSync(filePath, JSON.stringify(groupedByDoctype[doctype], null, 2));
-  });
-}
-
-async function processLetterHead(letterHeads: any, repoPath: string, siteName: string, requestOptions: any) {
-  for (const letterHead of letterHeads.data) {
-    try {
-      const letterHeadDetails = await fetchData(
-        `${siteName}/api/resource/Letter Head/${letterHead.name}?fields=["*"]`,
-        requestOptions
-      );
-
-      await saveletterHead(letterHeadDetails.data, repoPath);
-    } catch (err) {
-      console.error(`Error fetching details for Letter Head: ${letterHead.name}`, err);
-    }
-  }
-}
-
-async function saveletterHead(data: any, repoPath: string) {
-  const folderPath = path.join(repoPath, 'letterHead');
-  ensureDirectoryExists(folderPath);
-
-  const metaFileName = path.join(folderPath, `${data.name}.meta`);
-  const metaData = { ...data };
-
-  try {
-    await fs.promises.writeFile(metaFileName, JSON.stringify(metaData, null, 2));
-  } catch (err) {
-    console.error(`Error writing Letter Head file:`, err);
-  }
-}
-
-async function processPrintFormat(printFormats: any, repoPath: string, siteName: string, requestOptions: any) {
-  for (const printFormat of printFormats.data) {
-    try {
-      const printFormatDetails = await fetchData(
-        `${siteName}/api/resource/Print Format/${printFormat.name}?fields=["*"]`,
-        requestOptions
-      );
-
-      await savePrintFormat(printFormatDetails.data, repoPath);
-    } catch (err) {
-      console.error(`Error fetching details for Print Format: ${printFormat.name}`, err);
-    }
-  }
-}
-
-async function savePrintFormat(data: any, repoPath: string) {
-  const folderName = data.doc_type || "Unknown";
-  const folderPath = path.join(repoPath, 'printFormat', folderName);
-  ensureDirectoryExists(folderPath);
-
-  const metaFileName = path.join(folderPath, `${data.name}.meta`);
-  const metaData = { ...data };
-
-  try {
-    await fs.promises.writeFile(metaFileName, JSON.stringify(metaData, null, 2));
-  } catch (err) {
-    console.error(`Error writing Print Format file:`, err);
-  }
-}
-
-async function processReportData(data: any, repoPath: string, siteName: string, requestOptions: any) {
-  for (const report of data.data) {
-    try {
-      const reportDetails = await fetchData(
-        `${siteName}/api/resource/Report/${report.name}?fields=["*"]`,
-        requestOptions
-      );
-
-      await saveReport(reportDetails.data, repoPath);
-    } catch (err) {
-      console.error(`Error fetching details for Print Format: ${report.name}`, err);
-    }
-  }
-}
-
-async function saveReport(data: any, repoPath: string) {
-  const folderName = data.name;
-  const folderPath = path.join(repoPath, 'reports', folderName); //configure folderPath
-  const reportScriptContent = data.report_script;
-  const javascriptContent = data.javascript;
-  const queryContent = data.query;
-  const reportScriptName = data.name;
-  const javaScriptName = data.name;
-  const queryName = data.name;
-  const javaScriptFileName = path.join(folderPath, `${javaScriptName}.js`);
-  const reportScriptFileName = path.join(folderPath, `${reportScriptName}.py`);
-  const queryFileName = path.join(folderPath, `${queryName}.sql`);
-  const metaFileName = path.join(folderPath, `${folderName}.meta`);
-  ensureDirectoryExists(folderPath);
-
-  if (reportScriptContent) {
-    fs.writeFile(reportScriptFileName, reportScriptContent, { flag: 'w' }, (err) => {
-      if (err) {
-        console.error('Error writing report script file:', err);
+        const jsonFileName = path.join(folderPath, `${documentDetails.name}.json`);
+        const jsonData = { ...documentDetails };
+        fs.writeFileSync(jsonFileName, JSON.stringify(jsonData, null, 2));
       }
-    });
-  }
-  if (javascriptContent) {
-    fs.writeFile(javaScriptFileName, javascriptContent, { flag: 'w' }, (err) => {
-      if (err) {
-        console.error('Error writing JavaScript file:', err);
-      }
-    });
-  }
+      const doctype = documentDetails.reference_doctype || documentDetails.dt || documentDetails.ref_doctype;
+      if (!doctype) return; // Skip if no doctype key is found
 
-  if (queryContent) {
-    fs.writeFile(queryFileName, queryContent, { flag: 'w' }, (err) => {
-      if (err) {
-        console.error('Error writing query file:', err);
-      }
-    });
-  }
-  // Adjusted metadata
-  const metadata = { ...data };
-  delete metadata.report_script;
-  delete metadata.javascript;
-  delete metadata.query;
-  fs.writeFile(metaFileName, JSON.stringify(metadata), { flag: 'w' }, (err) => {
-    if (err) {
-      console.error('Error writing meta file:', err);
-    }
-  });
-}
-
-async function processCustomDoctype(
-  data: any,
-  repoPath: string,
-  siteName: string,
-  requestOptions: any
-): Promise<void> {
-  const documentDetails = data?.data;
-
-  if (!Array.isArray(documentDetails)) {
-    console.error("Invalid response structure: Expected an array in 'data'.");
-    return;
-  }
-
-  for (const item of documentDetails) {
-    try {
-      // Fetch full details for each DocType
-      const doctypeDetailsUrl = `${siteName}/api/resource/DocType/${encodeURIComponent(item.name)}?fields=["*"]&filters={\"module\": \"Custom\"}&limit_page_length=0`;
-      const response = await fetch(doctypeDetailsUrl, requestOptions);
-
-      if (!response.ok) {
-        console.error(`Failed to fetch ${item.name}: ${response.statusText}`);
-        continue;
-      }
-
-      const doctypeData: any = await response.json();
-
-      if (!doctypeData?.data) {
-        console.warn(`Skipping ${item.name}, missing 'data' field.`);
-        continue;
-      }
-
-      // Determine the correct folder based on type
-      const folderName =
-        item.istable === 1
-          ? "customChildDoctype"
-          : item.issingle === 1
-          ? "customSingleDoctype"
-          : "parent";
-
-      const folderPath = path.join(repoPath, "customDoctype", folderName);
+      const rootFolder = path.join(repoPath, 'doctype', doctype.toLowerCase().replace(/\s+/g, '_'));
+      ensureDirectoryExists(rootFolder);
+      const folderName = documentDetails.name.toLowerCase().replace(/\s+/g, '_');
+      const folderPath = path.join(rootFolder, resource, folderName);
       ensureDirectoryExists(folderPath);
 
-      // Save full DocType details to JSON
-      const jsonFileName = path.join(folderPath, `${item.name}.json`);
-      fs.writeFileSync(jsonFileName, JSON.stringify(doctypeData.data, null, 2));
+      const scriptFileName = path.join(folderPath, `${documentDetails.name}.${resource === 'client_script' ? 'js' : 'py'}`);
+      if (documentDetails.script) { 
+        fs.writeFileSync(scriptFileName, documentDetails.script || '');
+      }
 
-    } catch (error) {
-      console.error(`Error processing ${item.name}:`, error);
+      const jsonFileName = path.join(folderPath, `${documentDetails.name}.json`);
+      const jsonData = { ...documentDetails };
+      fs.writeFileSync(jsonFileName, JSON.stringify(jsonData, null, 2));
+      });
+  } else {
+    for (const item of data.data) {
+      try {
+        const details = await fetchData(
+          `${siteName}/api/resource/${resource}/${item.name}?fields=["*"]`,
+          requestOptions
+        );
+        const resourceName = resource.toLowerCase().replace(/\s+/g, '_');
+        if (resource == 'Report') {
+          await saveReport(details.data, repoPath, resourceName);
+        } else {
+          await saveWrite(details, repoPath, resourceName)
+        }
+      } catch (err) {
+        console.error(`Error fetching details for ${resource}: ${item.name}`, err);
+      }
     }
+  }
+}
+
+async function saveWrite(data: any, repoPath: string, resourceName: string) {
+  if (resourceName == 'letter_head') {
+    const rootFolder = path.join(repoPath, resourceName);
+    ensureDirectoryExists(rootFolder);
+    const folderName = data.data.name.toLowerCase().replace(/\s+/g, '_');
+    const folderPath = path.join(rootFolder, folderName);
+    ensureDirectoryExists(folderPath);
+    const jsonFileName = path.join(folderPath, `${data.data.name}.json`);
+    fs.writeFileSync(jsonFileName, JSON.stringify({ ...data.data }, null, 2));
+  } else {
+      if (Array.isArray(data.data)) {
+        data.data.forEach((documentDetails: any) => {
+          const doctype = documentDetails.reference_doctype || documentDetails.dt || documentDetails.ref_doctype || documentDetails.doc_type;
+          if (!doctype) return; // Skip if no doctype key is found
+
+          const rootFolder = path.join(repoPath, 'doctype', doctype.toLowerCase().replace(/\s+/g, '_'));
+          ensureDirectoryExists(rootFolder);
+          const folderName = documentDetails.name.toLowerCase().replace(/\s+/g, '_');
+          const folderPath = path.join(rootFolder, resourceName.toLowerCase().replace(/\s+/g, '_'), folderName);
+          ensureDirectoryExists(folderPath);
+
+          const jsonFileName = path.join(folderPath, `${documentDetails.name}.json`);
+          const jsonData = { ...documentDetails};
+          fs.writeFileSync(jsonFileName, JSON.stringify(jsonData, null, 2));
+        })
+      } else {
+          if (resourceName == 'doctype') {
+            const rootFolder = path.join(repoPath, 'doctype', data.data.name.toLowerCase().replace(/\s+/g, '_'));
+            ensureDirectoryExists(rootFolder);
+            const folderName = data.data.doctype.toLowerCase().replace(/\s+/g, '_');
+            const folderPath = path.join(rootFolder, folderName);
+            ensureDirectoryExists(folderPath);
+
+            const jsonFileName = path.join(folderPath, `${data.data.name}.json`);
+            const jsonData = { ...data.data};
+            fs.writeFileSync(jsonFileName, JSON.stringify(jsonData, null, 2));
+          }
+          const doctype = data.data.reference_doctype || data.data.dt || data.data.ref_doctype || data.data.doc_type;
+          if (!doctype) return; // Skip if no doctype key is found
+
+          const rootFolder = path.join(repoPath, 'doctype', doctype.toLowerCase().replace(/\s+/g, '_'));
+          ensureDirectoryExists(rootFolder);
+          const folderName = data.data.name.toLowerCase().replace(/\s+/g, '_');
+          const folderPath = path.join(rootFolder, resourceName.toLowerCase().replace(/\s+/g, '_'), folderName);
+          ensureDirectoryExists(folderPath);
+
+          const jsonFileName = path.join(folderPath, `${data.data.name}.json`);
+          const jsonData = { ...data.data};
+          fs.writeFileSync(jsonFileName, JSON.stringify(jsonData, null, 2));
+      }
+  }
+}
+
+async function saveReport(documentDetails: any, repoPath: string, resource: string): Promise<void> {
+  const doctype = documentDetails.reference_doctype || documentDetails.dt || documentDetails.ref_doctype;
+      if (!doctype) return; // Skip if no doctype key is found
+
+      const rootFolder = path.join(repoPath, 'doctype', doctype.toLowerCase().replace(/\s+/g, '_'));
+      ensureDirectoryExists(rootFolder);
+      const folderName = documentDetails.name.toLowerCase().replace(/\s+/g, '_');
+      const folderPath = path.join(rootFolder, resource, folderName);
+      ensureDirectoryExists(folderPath);
+
+  const jsonFileName = path.join(folderPath, `${documentDetails.name}.json`);
+  fs.writeFileSync(jsonFileName, JSON.stringify({ ...documentDetails }, null, 2));
+
+  if (documentDetails.report_script) {
+    fs.writeFileSync(path.join(folderPath, `${documentDetails.name}.py`), documentDetails.report_script);
+  }
+  if (documentDetails.javascript) {
+    fs.writeFileSync(path.join(folderPath, `${documentDetails.name}.js`), documentDetails.javascript);
+  }
+  if (documentDetails.query) {
+    fs.writeFileSync(path.join(folderPath, `${documentDetails.name}.sql`), documentDetails.query);
   }
 }
 
@@ -296,28 +193,28 @@ export default class RepoHygieneCommand extends Command {
     
     try {
       const clientScriptData = await fetchData(`${siteName}/api/resource/Client Script?fields=["*"]&limit_page_length=0`, requestOptions);
-      await processClientScript(clientScriptData, repoPath);
-      
-      const serverScriptData = await fetchData(`${siteName}/api/resource/Server Script?fields=["*"]&limit_page_length=0`, requestOptions);
-      await processServerScript(serverScriptData, repoPath);
+      await processWrite(clientScriptData, repoPath, siteName, requestOptions, 'client_script');
 
+      const serverScriptData = await fetchData(`${siteName}/api/resource/Server Script?fields=["*"]&limit_page_length=0`, requestOptions);
+      await processWrite(serverScriptData, repoPath, siteName, requestOptions, 'server_script');
+      
       const reportData = await fetchData(`${siteName}/api/resource/Report?fields=["*"]&filters={\"is_standard\": \"No\", \"disabled\":0}&limit_page_length=0`, requestOptions);
-      await processReportData(reportData, repoPath, siteName, requestOptions);
+      await processWrite(reportData, repoPath, siteName, requestOptions, 'Report');
 
       const letterHeadData = await fetchData(`${siteName}/api/resource/Letter Head?fields=["*"]&filters={\"disabled\":0}&limit_page_length=0`, requestOptions);
-      await processLetterHead(letterHeadData, repoPath, siteName, requestOptions);
-      
+      await processWrite(letterHeadData, repoPath, siteName, requestOptions, 'Letter Head');
+
       const printFormatData = await fetchData(`${siteName}/api/resource/Print Format?fields=["*"]&filters={\"standard\": \"No\", \"disabled\":0}&limit_page_length=0`, requestOptions);
-      await processPrintFormat(printFormatData, repoPath, siteName, requestOptions);
-      
+      await processWrite(printFormatData, repoPath, siteName, requestOptions, 'Print Format');
+
       const propertySetterData = await fetchData(`${siteName}/api/resource/Property Setter?fields=["*"]&limit_page_length=0`, requestOptions);
-      await processPropertySetter(propertySetterData, repoPath);
-      
+      await saveWrite(propertySetterData, repoPath, 'Property Setter');
+
       const customFieldData = await fetchData(`${siteName}/api/resource/Custom Field?fields=["*"]&limit_page_length=0`, requestOptions);
-      await processCustomField(customFieldData, repoPath);
-      
+      await saveWrite(customFieldData, repoPath, 'Custom Field');
+
       const customDoctypeData = await fetchData(`${siteName}/api/resource/DocType?fields=["*"]&filters={\"module\": \"Custom\"}&limit_page_length=0`, requestOptions);
-      await processCustomDoctype(customDoctypeData, repoPath, siteName, requestOptions);
+      await processWrite(customDoctypeData, repoPath, siteName, requestOptions, 'DocType');
     } catch (error) {
       console.error('❌ Error:', error);
     }
