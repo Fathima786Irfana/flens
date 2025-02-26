@@ -245,37 +245,42 @@ export default class RepoHygieneCommand extends Command {
             // Process the git status output and create changelog.txt
             const changeLog: string[] = [];
             const statusLines = gitStatus.split('\n');
-
+          
             statusLines.forEach((line) => {
               const statusCode = line.substring(0, 2).trim(); // Git status code
               const filePath = line.substring(3).trim(); // File path
-
-              let state = '';
-              if (statusCode === 'A') state = 'INSERT';
-              else if (statusCode === 'M') state = 'UPDATE';
-              else if (statusCode === 'D') state = 'DELETE';
-              else if (statusCode === 'R') state = 'RENAME';
-              else if (statusCode === '??') state = 'UNTRACKED';
-
-              if (state) {
-                changeLog.push(`${filePath.padEnd(50)} ${state}`);
+          
+              if (statusCode === 'A') {
+                changeLog.push(`${filePath.padEnd(50)} DELETE`);
               }
             });
-
+          
             // Define the log directory and file path
             const logDir = path.join(repoPath, 'log');
             const logFile = path.join(logDir, 'changelog.txt');
-
+          
             // Ensure the log directory exists
             if (!fs.existsSync(logDir)) {
               fs.mkdirSync(logDir, { recursive: true });
             }
-
+          
             // Write the changelog file
             fs.writeFileSync(logFile, changeLog.join('\n'), 'utf-8');
+          
+            this.log(`Use flens repo sync command to proceed.`);
+          
+            // Remove all staged changes except changelog.txt
+            try {
+              execSync(`git reset HEAD .`, { cwd: repoPath, stdio: 'ignore' });
+              execSync(`git restore --staged .`, { cwd: repoPath, stdio: 'inherit' }); // Unstage everything
+              execSync(`git restore .`, { cwd: repoPath, stdio: 'inherit' }); // Discard modifications
+              // Re-add only changelog.txt
+              execSync(`git add ${logFile}`, { cwd: repoPath, stdio: 'inherit' });
+              execSync(`git clean -df`, { cwd: repoPath, stdio: 'ignore' }); // Remove untracked files
 
-            this.log(`Changelog created at: ${logFile}`);
-            this.log(`Use flens repo sync command to proceed.`)
+            } catch (error) {
+              console.error('❌ Error while resetting staged changes:', error);
+            }
           } else {
              // Process the git status output and create changelog.txt
              const changeLog: string[] = [];
