@@ -1,96 +1,123 @@
-import { Command } from '@oclif/core';
 import fs from 'fs';
 import path from 'path';
-import fetch, { RequestInit } from 'node-fetch';
+import fetch from 'node-fetch';
+import { Command, Flags } from '@oclif/core';
 
-export default class RepoSync extends Command {
+export default class SyncCommand extends Command {
+  static description = 'Syncs Repo with Host';
+  static flags = {
+    help: Flags.help({ char: 'h' }),
+  };
   async run() {
-    try {
-      // Load current project details
-      const homeDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
-      const flensDir = path.join(homeDir, '.flens');
-      const currentProjectFile = path.join(flensDir, 'current_project.json');
-      if (!fs.existsSync(currentProjectFile)) {
-        throw new Error('❌ No active project set. Run "flens project use" first.');
+    const homeDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
+    const flensDir = path.join(homeDir, '.flens');
+    const currentProjectFile = path.join(flensDir, 'current_project.json');
+
+    if (!fs.existsSync(currentProjectFile)) {
+      this.error('current_project.json not found.');
+    }
+
+    const { siteName, repoName, key } = JSON.parse(fs.readFileSync(currentProjectFile, 'utf-8'));
+    const myHeaders = new Headers({
+      Authorization: key,
+      'Content-Type': 'application/json',
+    });
+
+    const requestOptionsPUT: RequestInit = { method: 'PUT', headers: myHeaders, redirect: 'follow' };
+    const requestOptionsPOST: RequestInit = { method: 'POST', headers: myHeaders, redirect: 'follow' };
+
+    const lRepoPath = path.join(homeDir, 'repositories', repoName);
+    const rootDirs = ['api', 'letter_head', 'doctype'];
+    for (const root of rootDirs) {
+      const folderPath = path.join(lRepoPath, root);
+      if (fs.existsSync(folderPath)) {
+        processDirectory(folderPath, requestOptionsPUT, requestOptionsPOST, siteName, root, 1);
       }
-      const projectData = JSON.parse(fs.readFileSync(currentProjectFile, 'utf-8'));
-      const { siteName, repoName, key } = projectData;
-
-      if (!siteName || !repoName || !key) {
-        this.error('Missing required fields in current_project.json');
-      }
-
-      // Load changelog.txt
-      const logFilePath = path.join(homeDir, 'repositories', repoName, 'log', 'changelog.txt');
-      if (!fs.existsSync(logFilePath)) {
-        this.error(`changelog.txt not found in ${logFilePath}`);
-      }
-      const logData = fs.readFileSync(logFilePath, 'utf-8').trim().split('\n');
-
-      // Define resource mappings
-      const mappings: Record<string, string> = {
-        letter_head: 'Letter Head',
-        print_format: 'Print Format',
-        custom_fields: 'Custom Field',
-        property_setter: 'Property Setter',
-        doctype: 'DocType'
-      };
-
-      // Process each line in changelog.txt
-      for (const line of logData) {
-        const parts = line.trim().split(' ');
-        const action = parts.pop() || ''; // Last word is the action (UPDATE, INSERT, DELETE)
-        const filePath = parts.join(' ').replace(/['"]+/g, "");
-        
-        if (!['UPDATE', 'INSERT', 'DELETE'].includes(action)) {
-          this.warn(`Skipping invalid action in log file: ${line}`);
-          continue;
-        }
-
-        const fileFullPath = path.join(homeDir, 'repositories', repoName, filePath);
-        if (!fs.existsSync(fileFullPath)) {
-          this.warn(`File not found: ${fileFullPath}`);
-          continue;
-        }
-
-        const fileContent = JSON.parse(fs.readFileSync(fileFullPath, 'utf-8'));
-        const segments = filePath.split('/');
-        const category = segments[0]; // Extract category from path
-        const fileName = path.basename(fileFullPath, '.json'); // Remove .json extension
-
-        if (!mappings[category]) {
-          this.warn(`Unknown category: ${category}, skipping file: ${fileFullPath}`);
-          continue;
-        }
-
-        const resourceType = mappings[category];
-        const apiUrl = `${siteName}/api/resource/${encodeURIComponent(resourceType)}/${encodeURIComponent(fileName)}`;
-        
-        // Set up request options
-        const requestOptions: RequestInit = {
-          method: action === 'UPDATE' ? 'PUT' : action === 'INSERT' ? 'POST' : 'DELETE',
-          headers: {
-            'Authorization': `${key}`,
-            'Content-Type': 'application/json'
-          },
-          body: action === 'DELETE' ? undefined : JSON.stringify(fileContent),
-          redirect: 'follow'
-        };
-
-        // Perform API request
-        try {
-          process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-          const response = await fetch(apiUrl, requestOptions);
-          if (!response.ok) {
-            throw new Error(`Failed to ${action} ${apiUrl}: ${response.statusText}`);
-          }
-          this.log(`${action} successful for ${fileName}`);
-        } catch (error: any) {
-          this.error(`Error processing ${fileName}: ${error.message}`);
-        }
-      }
-    } catch (error: any) {
-      this.error(`Error: ${error.message}`);
     }
   }
 }
+
+async function processDirectory(folderPath: string, putOptions: RequestInit, postOptions: RequestInit, siteName: string, parentDir: string, depth: number) {
+  const entries = fs.readdirSync(folderPath, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(folderPath, entry.name);
+    if (entry.isDirectory()) {
+      await processDirectory(fullPath, putOptions, postOptions, siteName, parentDir, depth + 1);
+    } else if (entry.name.endsWith('.json')) {
+      // If we find a JSON file, process it as a leaf node
+      await processSubdirectory(folderPath, putOptions, postOptions, siteName, parentDir, depth);
+    }
+  }
+}
+
+async function processSubdirectory(subDir: string, putOptions: RequestInit, postOptions: RequestInit, siteName: string, parentDir: string, depth: number) {
+  const files = fs.readdirSync(subDir);
+  const jsonFile = files.find(f => f.endsWith('.json'));
+  // const scriptFile = files.find(f => f.endsWith('.py') || f.endsWith('.js'));
+  if (!jsonFile) return;
+
+  let data = JSON.parse(fs.readFileSync(path.join(subDir, jsonFile), 'utf-8'));
+  ['creation', 'modified', 'modified_by', 'owner', 'roles'].forEach(key => delete data[key]);
+
+  // if (scriptFile) {
+  //   data.script = fs.readFileSync(path.join(subDir, scriptFile), 'utf-8');
+  // }
+  const jsFile = files.find(f => f.endsWith('.js'));
+  const pyFile = files.find(f => f.endsWith('.py'));
+  const sqlFile = files.find(f => f.endsWith('.sql'));
+
+  const resourceMap: Record<string, string | Record<string, string>> = {
+    api: 'Server Script',
+    letter_head: 'Letter Head',
+    doctype: {
+      print_format: 'Print Format',
+      custom_field: 'Custom Field',
+      doctype: 'DocType',
+      client_script: 'Client Script',
+      server_script: 'Server Script',
+      property_setter: 'Property Setter',
+      report: 'Report',
+    },
+  };
+
+  const parentFolder = path.basename((path.dirname(subDir))); // 2nd-level dir
+  // console.log(parentFolder)
+  const grandParentDir = path.basename(path.dirname(path.dirname(path.dirname(subDir)))); // 3rd-level dir
+  let resourceName: string | any;
+  // const subDirName = path.basename(subDir); // Current dir name
+  if (parentDir !== 'doctype') {
+    resourceName = resourceMap[parentDir];
+  } else if (parentDir === 'doctype' && depth >= 4) {
+    resourceName = (resourceMap.doctype as Record<string, string>)[parentFolder];
+  }
+  // console.log(resourceName)
+  if (!resourceName) return;
+
+  // Handle `report` inside `doctype` (third-level folder)
+  if (parentFolder === 'report' && grandParentDir === 'doctype') {
+    resourceName = 'Report';
+    data.javascript = jsFile ? fs.readFileSync(path.join(subDir, jsFile), 'utf-8') : "";
+    data.report_script = pyFile ? fs.readFileSync(path.join(subDir, pyFile), 'utf-8') : "";
+    data.query = sqlFile ? fs.readFileSync(path.join(subDir, sqlFile), 'utf-8') : "";
+  }
+  // Handle `client_script` and `server_script` inside `doctype` (third-level)
+  if (parentFolder !== 'report') {
+    data.script = jsFile || pyFile ? fs.readFileSync(path.join(subDir, jsFile || pyFile || ''), 'utf-8') : "";
+  }
+  // Get the file name without the extension
+  const fileName = path.basename(jsonFile, path.extname(jsonFile));
+
+  const url = `${siteName}/api/resource/${resourceName}/${fileName}`;
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+  await fetch(url, { ...putOptions, body: JSON.stringify(data) })
+    .then(response => {
+      if (response.status === 404) {
+        return fetch(url, { ...postOptions, body: JSON.stringify(data) });
+      }
+      return response;
+    })
+    .then(response => response.text())
+    // .then(result => console.log(`${resourceName} synced:`))
+    .catch(error => console.error(`Error syncing ${resourceName}:`, error));
+}
+

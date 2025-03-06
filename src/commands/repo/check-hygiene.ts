@@ -136,8 +136,10 @@ async function saveWrite(data: any, repoPath: string, resourceName: string) {
             const folderName = data.data.doctype.toLowerCase().replace(/\s+/g, '_');
             const folderPath = path.join(rootFolder, folderName);
             fnEnsureDirectoryExists(folderPath);
-
-            const jsonFileName = path.join(folderPath, `${data.data.name}.json`);
+            const dirName = data.data.name.toLowerCase().replace(/\s+/g, '_');
+            const dirPath = path.join(folderPath, dirName);
+            fnEnsureDirectoryExists(dirPath);
+            const jsonFileName = path.join(dirPath, `${data.data.name}.json`);
             const jsonData = { ...data.data};
             fs.writeFileSync(jsonFileName, JSON.stringify(jsonData, null, 2));
           }
