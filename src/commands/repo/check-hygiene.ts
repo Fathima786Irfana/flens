@@ -6,18 +6,18 @@ import { execSync } from 'child_process';
 import inquirer from 'inquirer';
 
 interface ldProjectConfig {
-  siteName: string;
-  key: string;
-  repoName: string;
+  lSiteName: string;
+  lKey: string;
+  lRepoName: string;
 }
 
 // Fetch the variable details from the active project set in the cli.
 function fnGetActiveProject(): ldProjectConfig {
   // Read the Active Project details present at
   // home/.<cli-name>/current_project.jsoon
-  const lHomeDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
-  const lFlensDir = path.join(lHomeDir, '.flens');
-  const lCurrentProjectFile = path.join(lFlensDir, 'current_project.json');
+  let lHomeDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
+  let lFlensDir = path.join(lHomeDir, '.flens');
+  let lCurrentProjectFile = path.join(lFlensDir, 'current_project.json');
 
   if (!fs.existsSync(lCurrentProjectFile)) {
     throw new Error('❌ No active project set. Run "flens project use" first.');
@@ -35,7 +35,7 @@ function fnEnsureDirectoryExists(iDirPath: string): void {
 
 // This function initialte an API Request.
 async function fnFetchData(iUrl: string, idRequestOptions: RequestInit): Promise<any> {
-  const ldResponse = await fetch(iUrl, idRequestOptions);
+  let ldResponse = await fetch(iUrl, idRequestOptions);
   if (!ldResponse.ok) {
     throw new Error(`❌ HTTP error! Status: ${ldResponse.status}`);
   }
@@ -43,60 +43,60 @@ async function fnFetchData(iUrl: string, idRequestOptions: RequestInit): Promise
 }
 
 // This function manipulate the response got from the API request
-async function fnProcessWrite(data: any, repoPath: string, siteName: string, requestOptions: any, resource: string): Promise<void> {
+async function fnProcessWrite(idData: any, iRepoPath: string, lSiteName: string, idRequestOptions: any, iResource: string): Promise<void> {
   // check whether the resource is Clinet or Server Script
-  if (resource === 'client_script' || resource === 'server_script') {
+  if (iResource === 'client_script' || iResource === 'server_script') {
 
-    data.data.forEach((documentDetails: any) => {
-      if ( resource === 'server_script' &&  documentDetails.script_type === 'API' ) {
-        const rootFolder = path.join(repoPath, 'api');
-        fnEnsureDirectoryExists(rootFolder);
-        const folderName = documentDetails.name.toLowerCase().replace(/\s+/g, '_');
-        const folderPath = path.join(rootFolder, folderName);
-        fnEnsureDirectoryExists(folderPath);
+    idData.data.forEach((ldDocumentDetails: any) => {
+      if ( iResource === 'server_script' &&  ldDocumentDetails.script_type === 'API' ) {
+        let lRootFolder = path.join(iRepoPath, 'api');
+        fnEnsureDirectoryExists(lRootFolder);
+        let lFolderName = ldDocumentDetails.name.toLowerCase().replace(/\s+/g, '_');
+        let lFolderPath = path.join(lRootFolder, lFolderName);
+        fnEnsureDirectoryExists(lFolderPath);
 
-        const scriptFileName = path.join(folderPath, `${documentDetails.name}.py`);
-        if (documentDetails.script) { 
-          fs.writeFileSync(scriptFileName, documentDetails.script || '');
+        let scriptFileName = path.join(lFolderPath, `${ldDocumentDetails.name}.py`);
+        if (ldDocumentDetails.script) { 
+          fs.writeFileSync(scriptFileName, ldDocumentDetails.script || '');
         }
 
-        const jsonFileName = path.join(folderPath, `${documentDetails.name}.json`);
-        const jsonData = { ...documentDetails };
-        fs.writeFileSync(jsonFileName, JSON.stringify(jsonData, null, 2));
+        let llJsonFileNAme = path.join(lFolderPath, `${ldDocumentDetails.name}.json`);
+        let ldJsonData = { ...ldDocumentDetails };
+        fs.writeFileSync(llJsonFileNAme, JSON.stringify(ldJsonData, null, 2));
       }
-      const doctype = documentDetails.reference_doctype || documentDetails.dt || documentDetails.ref_doctype;
+      let doctype = ldDocumentDetails.reference_doctype || ldDocumentDetails.dt || ldDocumentDetails.ref_doctype;
       if (!doctype) return; // Skip if no doctype key is found
 
-      const rootFolder = path.join(repoPath, 'doctype', doctype.toLowerCase().replace(/\s+/g, '_'));
-      fnEnsureDirectoryExists(rootFolder);
-      const folderName = documentDetails.name.toLowerCase().replace(/\s+/g, '_');
-      const folderPath = path.join(rootFolder, resource, folderName);
-      fnEnsureDirectoryExists(folderPath);
+      let lRootFolder = path.join(iRepoPath, 'doctype', doctype.toLowerCase().replace(/\s+/g, '_'));
+      fnEnsureDirectoryExists(lRootFolder);
+      let lFolderName = ldDocumentDetails.name.toLowerCase().replace(/\s+/g, '_');
+      let lFolderPath = path.join(lRootFolder, iResource, lFolderName);
+      fnEnsureDirectoryExists(lFolderPath);
 
-      const scriptFileName = path.join(folderPath, `${documentDetails.name}.${resource === 'client_script' ? 'js' : 'py'}`);
-      if (documentDetails.script) { 
-        fs.writeFileSync(scriptFileName, documentDetails.script || '');
+      let scriptFileName = path.join(lFolderPath, `${ldDocumentDetails.name}.${iResource === 'client_script' ? 'js' : 'py'}`);
+      if (ldDocumentDetails.script) { 
+        fs.writeFileSync(scriptFileName, ldDocumentDetails.script || '');
       }
 
-      const jsonFileName = path.join(folderPath, `${documentDetails.name}.json`);
-      const jsonData = { ...documentDetails };
-      fs.writeFileSync(jsonFileName, JSON.stringify(jsonData, null, 2));
+      let lJsonFileNAme = path.join(lFolderPath, `${ldDocumentDetails.name}.json`);
+      let ldJsonData = { ...ldDocumentDetails };
+      fs.writeFileSync(lJsonFileNAme, JSON.stringify(ldJsonData, null, 2));
       });
   } else {
-    for (const item of data.data) {
+    for (let ldItem of idData.data) {
       try {
-        const details = await fnFetchData(
-          `${siteName}/api/resource/${resource}/${item.name}?fields=["*"]`,
-          requestOptions
+        let ldDetails = await fnFetchData(
+          `${lSiteName}/api/resource/${iResource}/${ldItem.name}?fields=["*"]`,
+          idRequestOptions
         );
-        const resourceName = resource.toLowerCase().replace(/\s+/g, '_');
-        if (resource == 'Report') {
-          await saveReport(details.data, repoPath, resourceName);
+        let lResourceName = iResource.toLowerCase().replace(/\s+/g, '_');
+        if (iResource == 'Report') {
+          await fnSaveReport(ldDetails.data, iRepoPath, lResourceName);
         } else {
-          await saveWrite(details, repoPath, resourceName)
+          await fnSaveWrite(ldDetails, iRepoPath, lResourceName)
         }
       } catch (err) {
-        console.error(`Error fetching details for ${resource}: ${item.name}`, err);
+        console.error(`Error fetching details for ${iResource}: ${ldItem.name}`, err);
       }
     }
   }
@@ -104,83 +104,83 @@ async function fnProcessWrite(data: any, repoPath: string, siteName: string, req
 
 // This function is used to save the data of all resource except
 // Report in the current folder structure.
-async function saveWrite(data: any, repoPath: string, resourceName: string) {
-  if (resourceName == 'letter_head') {
-    const rootFolder = path.join(repoPath, resourceName);
-    fnEnsureDirectoryExists(rootFolder);
-    const folderName = data.data.name.toLowerCase().replace(/\s+/g, '_');
-    const folderPath = path.join(rootFolder, folderName);
-    fnEnsureDirectoryExists(folderPath);
-    const jsonFileName = path.join(folderPath, `${data.data.name}.json`);
-    fs.writeFileSync(jsonFileName, JSON.stringify({ ...data.data }, null, 2));
+async function fnSaveWrite(idData: any, iRepoPath: string, lResourceName: string) {
+  if (lResourceName == 'letter_head') {
+    let lRootFolder = path.join(iRepoPath, lResourceName);
+    fnEnsureDirectoryExists(lRootFolder);
+    let lFolderName = idData.data.name.toLowerCase().replace(/\s+/g, '_');
+    let lFolderPath = path.join(lRootFolder, lFolderName);
+    fnEnsureDirectoryExists(lFolderPath);
+    let lJsonFileNAme = path.join(lFolderPath, `${idData.data.name}.json`);
+    fs.writeFileSync(lJsonFileNAme, JSON.stringify({ ...idData.data }, null, 2));
   } else {
-      if (Array.isArray(data.data)) {
-        data.data.forEach((documentDetails: any) => {
-          const doctype = documentDetails.reference_doctype || documentDetails.dt || documentDetails.ref_doctype || documentDetails.doc_type;
+      if (Array.isArray(idData.data)) {
+        idData.data.forEach((ldDocumentDetails: any) => {
+          let doctype = ldDocumentDetails.reference_doctype || ldDocumentDetails.dt || ldDocumentDetails.ref_doctype || ldDocumentDetails.doc_type;
           if (!doctype) return; // Skip if no doctype key is found
 
-          const rootFolder = path.join(repoPath, 'doctype', doctype.toLowerCase().replace(/\s+/g, '_'));
-          fnEnsureDirectoryExists(rootFolder);
-          const folderName = documentDetails.name.toLowerCase().replace(/\s+/g, '_');
-          const folderPath = path.join(rootFolder, resourceName.toLowerCase().replace(/\s+/g, '_'), folderName);
-          fnEnsureDirectoryExists(folderPath);
+          let lRootFolder = path.join(iRepoPath, 'doctype', doctype.toLowerCase().replace(/\s+/g, '_'));
+          fnEnsureDirectoryExists(lRootFolder);
+          let lFolderName = ldDocumentDetails.name.toLowerCase().replace(/\s+/g, '_');
+          let lFolderPath = path.join(lRootFolder, lResourceName.toLowerCase().replace(/\s+/g, '_'), lFolderName);
+          fnEnsureDirectoryExists(lFolderPath);
 
-          const jsonFileName = path.join(folderPath, `${documentDetails.name}.json`);
-          const jsonData = { ...documentDetails};
-          fs.writeFileSync(jsonFileName, JSON.stringify(jsonData, null, 2));
+          let lJsonFileNAme = path.join(lFolderPath, `${ldDocumentDetails.name}.json`);
+          let ldJsonData = { ...ldDocumentDetails};
+          fs.writeFileSync(lJsonFileNAme, JSON.stringify(ldJsonData, null, 2));
         })
       } else {
-          if (resourceName == 'doctype') {
-            const rootFolder = path.join(repoPath, 'doctype', data.data.name.toLowerCase().replace(/\s+/g, '_'));
-            fnEnsureDirectoryExists(rootFolder);
-            const folderName = data.data.doctype.toLowerCase().replace(/\s+/g, '_');
-            const folderPath = path.join(rootFolder, folderName);
-            fnEnsureDirectoryExists(folderPath);
-            const dirName = data.data.name.toLowerCase().replace(/\s+/g, '_');
-            const dirPath = path.join(folderPath, dirName);
+          if (lResourceName == 'doctype') {
+            let lRootFolder = path.join(iRepoPath, 'doctype', idData.data.name.toLowerCase().replace(/\s+/g, '_'));
+            fnEnsureDirectoryExists(lRootFolder);
+            let lFolderName = idData.data.doctype.toLowerCase().replace(/\s+/g, '_');
+            let lFolderPath = path.join(lRootFolder, lFolderName);
+            fnEnsureDirectoryExists(lFolderPath);
+            let dirName = idData.data.name.toLowerCase().replace(/\s+/g, '_');
+            let dirPath = path.join(lFolderPath, dirName);
             fnEnsureDirectoryExists(dirPath);
-            const jsonFileName = path.join(dirPath, `${data.data.name}.json`);
-            const jsonData = { ...data.data};
-            fs.writeFileSync(jsonFileName, JSON.stringify(jsonData, null, 2));
+            let lJsonFileNAme = path.join(dirPath, `${idData.data.name}.json`);
+            let ldJsonData = { ...idData.data};
+            fs.writeFileSync(lJsonFileNAme, JSON.stringify(ldJsonData, null, 2));
           }
-          const doctype = data.data.reference_doctype || data.data.dt || data.data.ref_doctype || data.data.doc_type;
+          let doctype = idData.data.reference_doctype || idData.data.dt || idData.data.ref_doctype || idData.data.doc_type;
           if (!doctype) return; // Skip if no doctype key is found
 
-          const rootFolder = path.join(repoPath, 'doctype', doctype.toLowerCase().replace(/\s+/g, '_'));
-          fnEnsureDirectoryExists(rootFolder);
-          const folderName = data.data.name.toLowerCase().replace(/\s+/g, '_');
-          const folderPath = path.join(rootFolder, resourceName.toLowerCase().replace(/\s+/g, '_'), folderName);
-          fnEnsureDirectoryExists(folderPath);
+          let lRootFolder = path.join(iRepoPath, 'doctype', doctype.toLowerCase().replace(/\s+/g, '_'));
+          fnEnsureDirectoryExists(lRootFolder);
+          let lFolderName = idData.data.name.toLowerCase().replace(/\s+/g, '_');
+          let lFolderPath = path.join(lRootFolder, lResourceName.toLowerCase().replace(/\s+/g, '_'), lFolderName);
+          fnEnsureDirectoryExists(lFolderPath);
 
-          const jsonFileName = path.join(folderPath, `${data.data.name}.json`);
-          const jsonData = { ...data.data};
-          fs.writeFileSync(jsonFileName, JSON.stringify(jsonData, null, 2));
+          let lJsonFileNAme = path.join(lFolderPath, `${idData.data.name}.json`);
+          let ldJsonData = { ...idData.data};
+          fs.writeFileSync(lJsonFileNAme, JSON.stringify(ldJsonData, null, 2));
       }
   }
 }
 
 // This function write the data of only Report resource.
-async function saveReport(documentDetails: any, repoPath: string, resource: string): Promise<void> {
-  const doctype = documentDetails.reference_doctype || documentDetails.dt || documentDetails.ref_doctype;
+async function fnSaveReport(ldDocumentDetails: any, iRepoPath: string, iResource: string): Promise<void> {
+  let doctype = ldDocumentDetails.reference_doctype || ldDocumentDetails.dt || ldDocumentDetails.ref_doctype;
       if (!doctype) return; // Skip if no doctype key is found
 
-      const rootFolder = path.join(repoPath, 'doctype', doctype.toLowerCase().replace(/\s+/g, '_'));
-      fnEnsureDirectoryExists(rootFolder);
-      const folderName = documentDetails.name.toLowerCase().replace(/\s+/g, '_');
-      const folderPath = path.join(rootFolder, resource, folderName);
-      fnEnsureDirectoryExists(folderPath);
+      let lRootFolder = path.join(iRepoPath, 'doctype', doctype.toLowerCase().replace(/\s+/g, '_'));
+      fnEnsureDirectoryExists(lRootFolder);
+      let lFolderName = ldDocumentDetails.name.toLowerCase().replace(/\s+/g, '_');
+      let lFolderPath = path.join(lRootFolder, iResource, lFolderName);
+      fnEnsureDirectoryExists(lFolderPath);
 
-  const jsonFileName = path.join(folderPath, `${documentDetails.name}.json`);
-  fs.writeFileSync(jsonFileName, JSON.stringify({ ...documentDetails }, null, 2));
+  let lJsonFileNAme = path.join(lFolderPath, `${ldDocumentDetails.name}.json`);
+  fs.writeFileSync(lJsonFileNAme, JSON.stringify({ ...ldDocumentDetails }, null, 2));
 
-  if (documentDetails.report_script) {
-    fs.writeFileSync(path.join(folderPath, `${documentDetails.name}.py`), documentDetails.report_script);
+  if (ldDocumentDetails.report_script) {
+    fs.writeFileSync(path.join(lFolderPath, `${ldDocumentDetails.name}.py`), ldDocumentDetails.report_script);
   }
-  if (documentDetails.javascript) {
-    fs.writeFileSync(path.join(folderPath, `${documentDetails.name}.js`), documentDetails.javascript);
+  if (ldDocumentDetails.javascript) {
+    fs.writeFileSync(path.join(lFolderPath, `${ldDocumentDetails.name}.js`), ldDocumentDetails.javascript);
   }
-  if (documentDetails.query) {
-    fs.writeFileSync(path.join(folderPath, `${documentDetails.name}.sql`), documentDetails.query);
+  if (ldDocumentDetails.query) {
+    fs.writeFileSync(path.join(lFolderPath, `${ldDocumentDetails.name}.sql`), ldDocumentDetails.query);
   }
 }
 
@@ -190,78 +190,78 @@ export default class clRepoHygieneCommand extends Command {
   static flags = {
     help: Flags.help({ char: 'h' }),
   };
-
+  // build in function run of oclif package
   async run(): Promise<void> {
     console.log('🚀 Running hygiene checks ...');
-    const project = fnGetActiveProject();
-    const { siteName, key, repoName } = project;
-    const lHomeDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
-    const lRepoPath = path.join(lHomeDir, 'repositories', repoName);
+    let ldProject = fnGetActiveProject();
+    let { lSiteName, lKey, lRepoName } = ldProject;
+    let lHomeDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
+    let lRepoPath = path.join(lHomeDir, 'repositories', lRepoName);
     fnEnsureDirectoryExists(lRepoPath);
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
     
-    const headers = new Headers({ Authorization: key });
-    const ldRequestOptions: RequestInit = { method: 'GET', headers, redirect: 'follow' };
+    let headers = new Headers({ Authorization: lKey });
+    let ldRequestOptions: RequestInit = { method: 'GET', headers, redirect: 'follow' };
     
     try {
 
       // Fetch data for each resource and write using suitable write function
-      const ldClientScriptData = await fnFetchData(`${siteName}/api/resource/Client Script?fields=["*"]&limit_page_length=0`, ldRequestOptions);
-      await fnProcessWrite(ldClientScriptData, lRepoPath, siteName, ldRequestOptions, 'client_script');
+      let ldClientScriptData = await fnFetchData(`${lSiteName}/api/resource/Client Script?fields=["*"]&limit_page_length=0`, ldRequestOptions);
+      await fnProcessWrite(ldClientScriptData, lRepoPath, lSiteName, ldRequestOptions, 'client_script');
 
-      const ldServerScriptData = await fnFetchData(`${siteName}/api/resource/Server Script?fields=["*"]&limit_page_length=0`, ldRequestOptions);
-      await fnProcessWrite(ldServerScriptData, lRepoPath, siteName, ldRequestOptions, 'server_script');
+      let ldServerScriptData = await fnFetchData(`${lSiteName}/api/resource/Server Script?fields=["*"]&limit_page_length=0`, ldRequestOptions);
+      await fnProcessWrite(ldServerScriptData, lRepoPath, lSiteName, ldRequestOptions, 'server_script');
       
-      const ldReportData = await fnFetchData(`${siteName}/api/resource/Report?fields=["*"]&filters={\"is_standard\": \"No\", \"disabled\":0}&limit_page_length=0`, ldRequestOptions);
-      await fnProcessWrite(ldReportData, lRepoPath, siteName, ldRequestOptions, 'Report');
+      let ldReportData = await fnFetchData(`${lSiteName}/api/resource/Report?fields=["*"]&filters={\"is_standard\": \"No\", \"disabled\":0}&limit_page_length=0`, ldRequestOptions);
+      await fnProcessWrite(ldReportData, lRepoPath, lSiteName, ldRequestOptions, 'Report');
 
-      const ldLetterHeadData = await fnFetchData(`${siteName}/api/resource/Letter Head?fields=["*"]&filters={\"disabled\":0}&limit_page_length=0`, ldRequestOptions);
-      await fnProcessWrite(ldLetterHeadData, lRepoPath, siteName, ldRequestOptions, 'Letter Head');
+      let ldLetterHeadData = await fnFetchData(`${lSiteName}/api/resource/Letter Head?fields=["*"]&filters={\"disabled\":0}&limit_page_length=0`, ldRequestOptions);
+      await fnProcessWrite(ldLetterHeadData, lRepoPath, lSiteName, ldRequestOptions, 'Letter Head');
 
-      const ldPrintFormatData = await fnFetchData(`${siteName}/api/resource/Print Format?fields=["*"]&filters={\"standard\": \"No\", \"disabled\":0}&limit_page_length=0`, ldRequestOptions);
-      await fnProcessWrite(ldPrintFormatData, lRepoPath, siteName, ldRequestOptions, 'Print Format');
+      let ldPrintFormatData = await fnFetchData(`${lSiteName}/api/resource/Print Format?fields=["*"]&filters={\"standard\": \"No\", \"disabled\":0}&limit_page_length=0`, ldRequestOptions);
+      await fnProcessWrite(ldPrintFormatData, lRepoPath, lSiteName, ldRequestOptions, 'Print Format');
 
-      const ldPropertySetterData = await fnFetchData(`${siteName}/api/resource/Property Setter?fields=["*"]&limit_page_length=0`, ldRequestOptions);
-      await saveWrite(ldPropertySetterData, lRepoPath, 'Property Setter');
+      let ldPropertySetterData = await fnFetchData(`${lSiteName}/api/resource/Property Setter?fields=["*"]&limit_page_length=0`, ldRequestOptions);
+      await fnSaveWrite(ldPropertySetterData, lRepoPath, 'Property Setter');
 
-      const ldCustomFieldData = await fnFetchData(`${siteName}/api/resource/Custom Field?fields=["*"]&limit_page_length=0`, ldRequestOptions);
-      await saveWrite(ldCustomFieldData, lRepoPath, 'Custom Field');
+      let ldCustomFieldData = await fnFetchData(`${lSiteName}/api/resource/Custom Field?fields=["*"]&limit_page_length=0`, ldRequestOptions);
+      await fnSaveWrite(ldCustomFieldData, lRepoPath, 'Custom Field');
 
-      const ldCustomDoctypeData = await fnFetchData(`${siteName}/api/resource/DocType?fields=["*"]&filters={\"module\": \"Custom\"}&limit_page_length=0`, ldRequestOptions);
-      await fnProcessWrite(ldCustomDoctypeData, lRepoPath, siteName, ldRequestOptions, 'DocType');
+      let ldCustomDoctypeData = await fnFetchData(`${lSiteName}/api/resource/DocType?fields=["*"]&filters={\"module\": \"Custom\"}&limit_page_length=0`, ldRequestOptions);
+      await fnProcessWrite(ldCustomDoctypeData, lRepoPath, lSiteName, ldRequestOptions, 'DocType');
     try {
       // Stage files first to get proper status
       execSync('git add .', { cwd: lRepoPath });
       // Get the changed files of working commit.
-      const lGitStatus = execSync('git status --porcelain=v1', { cwd: lRepoPath }).toString().trim();
+      let lGitStatus = execSync('git status --porcelain=v1', { cwd: lRepoPath }).toString().trim();
       
       if (lGitStatus) {
         // this create select action as used in other cli commands
-        const { sync } = await inquirer.prompt([
+        let { lSync } = await inquirer.prompt([
           {
             type: 'list',
-            name: 'sync',
+            name: 'lSync',
             message: `Your Host and Repo is not in sync. Do you want to sync ?.`,
             choices: ['Yes', 'No'],
           },
         ]);
-        if (sync === 'Yes') {
-          const { syncOption } = await inquirer.prompt([
+        if (lSync === 'Yes') {
+          let { lSyncOption } = await inquirer.prompt([
             {
               type: 'list',
-              name: 'syncOption',
+              name: 'lSyncOption',
               message: `Choose any option for syncing.`,
               choices: ['Repo to Host', 'Host to Repo'],
             },
           ]);
-          if (syncOption === 'Repo to Host') {
+          if (lSyncOption === 'Repo to Host') {
             // Process the git status output and create changelog.txt
-            const laChangeLog: string[] = [];
-            const laStatusLines = lGitStatus.split('\n');
+            let laChangeLog: string[] = [];
+            let laStatusLines = lGitStatus.split('\n');
           
             laStatusLines.forEach((lLine) => {
-              const lStatusCode = lLine.substring(0, 2).trim(); // Git status code
-              const lFilePath = lLine.substring(3).trim(); // File path
+              let lStatusCode = lLine.substring(0, 2).trim(); // Git status code
+              let lFilePath = lLine.substring(3).trim(); // File path
           
               if (lStatusCode === 'A') {
                 laChangeLog.push(`${lFilePath.padEnd(50)} DELETE`);
@@ -269,8 +269,8 @@ export default class clRepoHygieneCommand extends Command {
             });
           
             // Define the log directory and file path
-            const lLogDir = path.join(lRepoPath, 'log');
-            const lLogFile = path.join(lLogDir, 'changelog.txt');
+            let lLogDir = path.join(lRepoPath, 'log');
+            let lLogFile = path.join(lLogDir, 'changelog.txt');
           
             // Ensure the log directory exists
             if (!fs.existsSync(lLogDir)) {
@@ -296,12 +296,12 @@ export default class clRepoHygieneCommand extends Command {
             }
           } else {
              // Process the git status output and create changelog.txt
-             const laChangeLog: string[] = [];
-             const laStatusLines = lGitStatus.split('\n');
+             let laChangeLog: string[] = [];
+             let laStatusLines = lGitStatus.split('\n');
  
              laStatusLines.forEach((lLine) => {
-               const lStatusCode = lLine.substring(0, 2).trim(); // Git status code
-               const lFilePath = lLine.substring(3).trim(); // File path
+               let lStatusCode = lLine.substring(0, 2).trim(); // Git status code
+               let lFilePath = lLine.substring(3).trim(); // File path
               // Map the status code with understandable format
                let state = '';
                if (lStatusCode === 'A') state = 'INSERT';
@@ -316,8 +316,8 @@ export default class clRepoHygieneCommand extends Command {
              });
  
              // Define the log directory and file path
-             const lLogDir = path.join(lRepoPath, 'log');
-             const lLogFile = path.join(lLogDir, 'changelog.txt');
+             let lLogDir = path.join(lRepoPath, 'log');
+             let lLogFile = path.join(lLogDir, 'changelog.txt');
  
              // Ensure the log directory exists
              if (!fs.existsSync(lLogDir)) {
@@ -342,7 +342,7 @@ export default class clRepoHygieneCommand extends Command {
         this.log(`No change is detected. Your Instance is in sync with IDE.`);
       } 
     } catch (error) {
-      this.log(`Error checking Git status for ${siteName}: ${(error as Error).message}`);
+      this.log(`Error checking Git status for ${lSiteName}: ${(error as Error).message}`);
     }
     } catch (error) {
       console.error('❌ Error:', error);
