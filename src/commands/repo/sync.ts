@@ -4,79 +4,97 @@ import fetch from 'node-fetch';
 import { Command, Flags } from '@oclif/core';
 import ora from 'ora';
 
-export default class SyncCommand extends Command {
-  static description = 'Syncs Repo with Host';
-  static flags = {
-    help: Flags.help({ char: 'h' }),
-  };
-  async run() {
-    const homeDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
-    const flensDir = path.join(homeDir, '.flens');
-    const currentProjectFile = path.join(flensDir, 'current_project.json');
+export default class clSyncCommand extends Command {
 
-    if (!fs.existsSync(currentProjectFile)) {
-      this.error('current_project.json not found.');
+  // description and flags are keywords of Command class
+  static description = 'Syncs Repo with Host'; // Command description for help output
+  static flags = {
+    help: Flags.help({ char: 'h' }), // Define a help flag (-h) for the command
+  };
+
+  // built-in function of Oclif
+  async run() {
+
+    // Determine the user's home directory based on OS
+    let lHomeDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
+    let lFlensDir = path.join(lHomeDir, '.flens');
+    let lCurrentProjectFile = path.join(lFlensDir, 'current_project.json'); // Path to the current project metadata file
+
+    // Check if the current project file exists
+    if (!fs.existsSync(lCurrentProjectFile)) {
+      throw new Error('❌ No active project set. Run "flens project use" first.');
     }
 
-    const { siteName, repoName, key } = JSON.parse(fs.readFileSync(currentProjectFile, 'utf-8'));
-    const myHeaders = new Headers({
+    // Read and parse the current project JSON file
+    let { siteName, repoName, key } = JSON.parse(fs.readFileSync(lCurrentProjectFile, 'utf-8'));
+
+    // Define HTTP headers for API requests
+    let ldMyHeaders = new Headers({
       Authorization: key,
       'Content-Type': 'application/json',
     });
 
-    const requestOptionsPUT: RequestInit = { method: 'PUT', headers: myHeaders, redirect: 'follow' };
-    const requestOptionsPOST: RequestInit = { method: 'POST', headers: myHeaders, redirect: 'follow' };
-    const requestOptionsDELETE: RequestInit = { method: 'DELETE', headers: myHeaders, redirect: 'follow' };
+     // Define request options for different HTTP methods
+    let ldRequestOptionsPUT: RequestInit = { method: 'PUT', headers: ldMyHeaders, redirect: 'follow' };
+    let ldRequestOptionsPOST: RequestInit = { method: 'POST', headers: ldMyHeaders, redirect: 'follow' };
+    let ldRequestOptionsDELETE: RequestInit = { method: 'DELETE', headers: ldMyHeaders, redirect: 'follow' };
 
-    const lRepoPath = path.join(homeDir, 'repositories', repoName);
-    const rootDirs = ['api', 'letter_head', 'doctype'];
-    const spinner = ora({ text: 'Syncing...\n', spinner: 'dots' }).start();
-    for (const root of rootDirs) {
-      const folderPath = path.join(lRepoPath, root);
-      if (fs.existsSync(folderPath)) {
-        await processDirectory(folderPath, requestOptionsPUT, requestOptionsPOST, siteName, root, 1);
+    let lRepoPath = path.join(lHomeDir, 'repositories', repoName);
+    let laRootDirs = ['api', 'letter_head', 'doctype']; // Directories to be synced
+    let ldSpinner = ora({ text: 'Syncing...\n', spinner: 'dots' }).start();
+    // Process each root directory in the repository
+    for (let lRoot of laRootDirs) {
+      let lFolderPath = path.join(lRepoPath, lRoot);
+      if (fs.existsSync(lFolderPath)) {
+        await fnProcessDirectory(lFolderPath, ldRequestOptionsPUT, ldRequestOptionsPOST, siteName, lRoot, 1);
       }
     }
-    // Process changelog for DELETE requests
-    const changelogPath = path.join(lRepoPath, 'log', 'changelog.txt');
-    if (fs.existsSync(changelogPath) && fs.statSync(changelogPath).size > 0) {
-      spinner.text = '📄 Deleting Host Resource not in Repo...';
-      await processChangelog(changelogPath, siteName, requestOptionsDELETE);
+
+    // Process the changelog file to handle deletions of resource in the Host
+    // that are not maintained in the Repo.
+    let lChangelogPath = path.join(lRepoPath, 'log', 'changelog.txt');
+    if (fs.existsSync(lChangelogPath) && fs.statSync(lChangelogPath).size > 0) {
+      await fnProcessChangelog(lChangelogPath, siteName, ldRequestOptionsDELETE);
     }
-    spinner.succeed('Sync Completed Successfully!\n');
+    ldSpinner.succeed('Sync Completed Successfully!\n');
   }
 }
 
-async function processDirectory(folderPath: string, putOptions: RequestInit, postOptions: RequestInit, siteName: string, parentDir: string, depth: number) {
-  const entries = fs.readdirSync(folderPath, { withFileTypes: true });
-  for (const entry of entries) {
-    const fullPath = path.join(folderPath, entry.name);
-    if (entry.isDirectory()) {
-      await processDirectory(fullPath, putOptions, postOptions, siteName, parentDir, depth + 1);
-    } else if (entry.name.endsWith('.json')) {
+// Recursively process a directory and sync JSON files
+async function fnProcessDirectory(iFolderPath: string, iPutOptions: RequestInit, iPostOptions: RequestInit, iSiteName: string, iParentDir: string, iDepth: number) {
+  let ldEntries = fs.readdirSync(iFolderPath, { withFileTypes: true });
+  for (let ldEntry of ldEntries) {
+    let lFullPath = path.join(iFolderPath, ldEntry.name);
+    if (ldEntry.isDirectory()) {
+      // Recursively process subdirectories
+      await fnProcessDirectory(lFullPath, iPutOptions, iPostOptions, iSiteName, iParentDir, iDepth + 1);
+    } else if (ldEntry.name.endsWith('.json')) {
       // If we find a JSON file, process it as a leaf node
-      await processSubdirectory(folderPath, putOptions, postOptions, siteName, parentDir, depth);
+      await fnProcessSubdirectory(iFolderPath, iPutOptions, iPostOptions, iSiteName, iParentDir, iDepth);
     }
   }
 }
 
-async function processSubdirectory(subDir: string, putOptions: RequestInit, postOptions: RequestInit, siteName: string, parentDir: string, depth: number) {
-  const files = fs.readdirSync(subDir);
-  const jsonFile = files.find(f => f.endsWith('.json'));
-  // const scriptFile = files.find(f => f.endsWith('.py') || f.endsWith('.js'));
-  if (!jsonFile) return;
+// Process a subdirectory and sync its contents
+async function fnProcessSubdirectory(iSubDir: string, iPutOptions: RequestInit, iPostOptions: RequestInit, iSiteName: string, iParentDir: string, iDepth: number) {
+  
+  // Read all files in the given subdirectory
+  let lFiles = fs.readdirSync(iSubDir);
+  let lJsonFile = lFiles.find(f => f.endsWith('.json'));
+  if (!lJsonFile) return; // Skip if no JSON file is found
 
-  let data = JSON.parse(fs.readFileSync(path.join(subDir, jsonFile), 'utf-8'));
-  ['creation', 'modified', 'modified_by', 'owner', 'roles'].forEach(key => delete data[key]);
+  // Read and parse the JSON file
+  let ldData = JSON.parse(fs.readFileSync(path.join(iSubDir, lJsonFile), 'utf-8'));
+  // Remove unnecessary metadata fields from the JSON data
+  ['creation', 'modified', 'modified_by', 'owner', 'roles'].forEach(lKey => delete ldData[lKey]);
 
-  // if (scriptFile) {
-  //   data.script = fs.readFileSync(path.join(subDir, scriptFile), 'utf-8');
-  // }
-  const jsFile = files.find(f => f.endsWith('.js'));
-  const pyFile = files.find(f => f.endsWith('.py'));
-  const sqlFile = files.find(f => f.endsWith('.sql'));
+  // Identify additional script files
+  let lJsFile = lFiles.find(f => f.endsWith('.js'));
+  let lPyFile = lFiles.find(f => f.endsWith('.py'));
+  let lSqlFile = lFiles.find(f => f.endsWith('.sql'));
 
-  const resourceMap: Record<string, string | Record<string, string>> = {
+  // Define mapping of resource types
+  let ldResourceMap: Record<string, string | Record<string, string>> = {
     api: 'Server Script',
     letter_head: 'Letter Head',
     doctype: {
@@ -90,65 +108,71 @@ async function processSubdirectory(subDir: string, putOptions: RequestInit, post
     },
   };
 
-  const parentFolder = path.basename((path.dirname(subDir))); // 2nd-level dir
-  // console.log(parentFolder)
-  const grandParentDir = path.basename(path.dirname(path.dirname(path.dirname(subDir)))); // 3rd-level dir
-  let resourceName: string | any;
-  // const subDirName = path.basename(subDir); // Current dir name
-  if (parentDir !== 'doctype') {
-    resourceName = resourceMap[parentDir];
-  } else if (parentDir === 'doctype' && depth >= 4) {
-    resourceName = (resourceMap.doctype as Record<string, string>)[parentFolder];
+  // Determine the resource type based on folder structure
+  let lParentFolder = path.basename((path.dirname(iSubDir))); // 2nd-level dir
+  let lGrandParentDir = path.basename(path.dirname(path.dirname(path.dirname(iSubDir)))); // 3rd-level dir
+  let lResourceName: string | any;
+  // Assign resource name based on the parent directory
+  if (iParentDir !== 'doctype') {
+    lResourceName = ldResourceMap[iParentDir];
+  } else if (iParentDir === 'doctype' && iDepth >= 4) {
+    lResourceName = (ldResourceMap.doctype as Record<string, string>)[lParentFolder];
   }
-  // console.log(resourceName)
-  if (!resourceName) return;
+  if (!lResourceName) return; // If no valid resource type is found, exit the function
 
-  // Handle `report` inside `doctype` (third-level folder)
-  if (parentFolder === 'report' && grandParentDir === 'doctype') {
-    resourceName = 'Report';
-    data.javascript = jsFile ? fs.readFileSync(path.join(subDir, jsFile), 'utf-8') : "";
-    data.report_script = pyFile ? fs.readFileSync(path.join(subDir, pyFile), 'utf-8') : "";
-    data.query = sqlFile ? fs.readFileSync(path.join(subDir, sqlFile), 'utf-8') : "";
-    
+  // Special handling for "report" resources inside root "doctype" directory
+  if (lParentFolder === 'report' && lGrandParentDir === 'doctype') {
+    lResourceName = 'Report';
+    // Read script files and attach them to the JSON data
+    ldData.javascript = lJsFile ? fs.readFileSync(path.join(iSubDir, lJsFile), 'utf-8') : "";
+    ldData.report_script = lPyFile ? fs.readFileSync(path.join(iSubDir, lPyFile), 'utf-8') : "";
+    ldData.query = lSqlFile ? fs.readFileSync(path.join(iSubDir, lSqlFile), 'utf-8') : "";
   }
-  // Handle `client_script` and `server_script` inside `doctype` (third-level)
-  if (parentFolder !== 'report') {
-    data.script = jsFile || pyFile ? fs.readFileSync(path.join(subDir, jsFile || pyFile || ''), 'utf-8') : "";
+  // Handle `client_script` and `server_script` inside `doctype` directory
+  if (lParentFolder !== 'report') {
+    ldData.script = lJsFile || lPyFile ? fs.readFileSync(path.join(iSubDir, lJsFile || lPyFile || ''), 'utf-8') : "";
   }
-  // Get the file name without the extension
-  const fileName = path.basename(jsonFile, path.extname(jsonFile));
+  // Extract the resource name (without extension) from the JSON filename
+  let lFileName = path.basename(lJsonFile, path.extname(lJsonFile));
 
-  const url = `${siteName}/api/resource/${resourceName}/${fileName}`;
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-  await fetch(url, { ...putOptions, body: JSON.stringify(data) })
-    .then(response => {
-      if (response.status === 404) {
-        let url = `${siteName}/api/resource/${resourceName}`;
-        return fetch(url, { ...postOptions, body: JSON.stringify(data) });
+  // Construct API URL for updating the resource
+  let lUrl = `${iSiteName}/api/resource/${lResourceName}/${lFileName}`;
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0"; // Disable SSL certificate verification
+
+  // Construct API URL and send a PUT request; if it fails, send a POST request
+  await fetch(lUrl, { ...iPutOptions, body: JSON.stringify(ldData) })
+    .then(ldResponse => {
+      if (ldResponse.status === 404) {
+        // If the resource does not exist, send a POST request to create it
+        let lUrl = `${iSiteName}/api/resource/${lResourceName}`;
+        return fetch(lUrl, { ...iPostOptions, body: JSON.stringify(ldData) });
       }
-      return response;
+      return ldResponse;
     })
-    .then(response => response.text())
-    // .then(result => console.log(`${resourceName} synced:`))
-    .catch(error => console.error(`Error syncing ${resourceName}:`, error));
+    .then(ldResponse => ldResponse.text())
+    .catch(error => console.error(`Error syncing ${lResourceName}:`, error));
 }
-async function processChangelog(changelogPath: string, siteName: string, deleteOptions: any) {
-  const logEntries = fs.readFileSync(changelogPath, 'utf-8').split('\n').filter(line => line.trim().endsWith('DELETE')); // Ignore lines starting with "log/"
-  const processedEntries = new Set();
+
+// Process a changelog file and delete corresponding resources not in REPO from HOST
+async function fnProcessChangelog(iChangelogPath: string, iSiteName: string, iDeleteOptions: any) {
+  // Read the changelog file and filter lines that contain "DELETE"
+  let lLogEntries = fs.readFileSync(iChangelogPath, 'utf-8').split('\n').filter(ldLine => ldLine.trim().endsWith('DELETE'));
+  let ldProcessedEntries = new Set(); // Track processed entries to avoid duplicates
   
-  for (const line of logEntries) {
-    const match = line.match(/^"?(.+?)"?\s+DELETE$/);
-    if (!match) continue;
-    const fullPath = match[1];
-    const parts = fullPath.split('/');
-    if (parts.length < 3) continue;
+  for (let ldLine of lLogEntries) {
+    // Extract the file path from the changelog entry
+    let lMatch = ldLine.match(/^"?(.+?)"?\s+DELETE$/);
+    if (!lMatch) continue;
+    let lFullPath = lMatch[1]; // Full path of the resource to delete
+    let lParts = lFullPath.split('/');
+    if (lParts.length < 3) continue; // Ignore malformed paths
+    let lParentDir = lParts[0]; // Root-level directory (e.g., "doctype")
+    let lResourceDir = lParts[lParts.length - 3]; // Resource category (e.g., "print_format")
+    let lFileNameWithExt = lParts[lParts.length - 1]; // Filename with extension
+    let lFileName = lFileNameWithExt.replace(/\.[^/.]+$/, ''); // Remove file extension
 
-    const parentDir = parts[0];
-    const fileNameWithExt = parts[parts.length - 1];
-    const fileName = fileNameWithExt.replace(/\.[^/.]+$/, '');
-    const resourceType = parts[parts.length - 2];
-
-    const resourceMap: Record<string, string | Record<string, string>> = {
+    // Define mapping of resource types
+    let ldResourceMap: Record<string, string | Record<string, string>> = {
       api: 'Server Script',
       letter_head: 'Letter Head',
       doctype: {
@@ -161,23 +185,25 @@ async function processChangelog(changelogPath: string, siteName: string, deleteO
         report: 'Report',
       },
     };
-
-    let resourceName;
-    if (parentDir !== 'doctype') {
-      resourceName = resourceMap[parentDir];
-    } else if (parentDir === 'doctype' ) {
-      const doctypeMap = resourceMap.doctype as Record<string, string>;
-      resourceName = doctypeMap[parentDir];
+    let lResourceName;
+    if (lParentDir !== 'doctype') {
+      lResourceName = ldResourceMap[lParentDir]; // Direct lookup
+    } else if (lParentDir === 'doctype' ) {
+      let lDoctypeMap = ldResourceMap.doctype as Record<string, string>;
+      lResourceName = lDoctypeMap[lResourceDir]; // Lookup in doctype-specific mappings
     }
-    if (!resourceName) continue;
-    const entryKey = `${resourceName}/${fileName}`;
-    if (processedEntries.has(entryKey)) continue;
-    processedEntries.add(entryKey);
-    const url = `${siteName}/api/resource/${resourceName}/${fileName}`;
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-    await fetch(url, deleteOptions)
-      .then(response => response.text())
-      .then(() => console.log(`\nDeleted: ${resourceName}/${fileName}`))
-      .catch(error => console.error(`\nError deleting ${resourceName}/${fileName}:`, error));
+    if (!lResourceName) continue; // Skip if resource type is not recognized
+    // Construct a unique key to prevent duplicate deletion requests
+    let lEntryKey = `${lResourceName}/${lFileName}`;
+    if (ldProcessedEntries.has(lEntryKey)) continue; // Skip if already processed
+    ldProcessedEntries.add(lEntryKey);
+    // Construct the API URL for the DELETE request
+    let lUrl = `${iSiteName}/api/resource/${lResourceName}/${lFileName}`;
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'; // Disable SSL verification
+
+    // Send DELETE request to remove the resource
+    await fetch(lUrl, iDeleteOptions)
+      .then(ldResponse => ldResponse.text())
+      .catch(error => console.error(`\nError deleting ${lResourceName}/${lFileName}:`, error));
   }
 }
