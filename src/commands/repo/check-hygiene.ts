@@ -217,6 +217,7 @@ function fnWriteLogFile(iRepoPath: string, iaChangeLog: string[]){
   }
   // Write the changelog file
   fs.writeFileSync(lLogFile, iaChangeLog.join('\n'), 'utf-8');
+  return lLogFile;
 }
 
 export default class clRepoHygieneCommand extends Command {
@@ -301,9 +302,8 @@ export default class clRepoHygieneCommand extends Command {
                 laChangeLog.push(`${lFilePath.padEnd(50)} DELETE`);
               }
             });
-            let lLogFile;
             // Write the changeLog file
-            fnWriteLogFile(lRepoPath, laChangeLog);
+            let lLogFile = fnWriteLogFile(lRepoPath, laChangeLog);
             this.log(`Use flens repo sync command to proceed.`);
           
             // Remove all staged changes except changelog.txt

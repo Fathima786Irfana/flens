@@ -129,7 +129,7 @@ async function processSubdirectory(subDir: string, putOptions: RequestInit, post
     .catch(error => console.error(`Error syncing ${resourceName}:`, error));
 }
 async function processChangelog(changelogPath: string, siteName: string, deleteOptions: any) {
-  const logEntries = fs.readFileSync(changelogPath, 'utf-8').split('\n').filter(line => line.trim().endsWith('DELETE'));
+  const logEntries = fs.readFileSync(changelogPath, 'utf-8').split('\n').filter(line => line.trim().endsWith('DELETE') && !line.startsWith('log/')); // Ignore lines starting with "log/"
   const processedEntries = new Set();
   
   for (const line of logEntries) {
