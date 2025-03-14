@@ -1,3 +1,4 @@
+// Import necessary modules and dependencies
 import { Command, Flags } from '@oclif/core';
 import fs from 'fs';
 import path from 'path';
@@ -5,30 +6,34 @@ import fetch, { RequestInit } from 'node-fetch';
 import { execSync } from 'child_process';
 import inquirer from 'inquirer';
 
-interface ldProjectConfig {
-  lSiteName: string;
-  lKey: string;
-  lRepoName: string;
+// Define an interface for the project configuration
+interface iProjectConfig {
+  siteName: string; // Name of the site associated with the project (default variable name used in project)
+  key: string; // Unique key for the project (default variable name used in project)
+  repoName: string; // Repository name linked to the project (default variable name used in project)
 }
 
 // Fetch the variable details from the active project set in the cli.
-function fnGetActiveProject(): ldProjectConfig {
-  // Read the Active Project details present at
+function fnGetActiveProject(): iProjectConfig {
+  // Determine the home directory path based on the OS environment variables
   // home/.<cli-name>/current_project.jsoon
   let lHomeDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
   let lFlensDir = path.join(lHomeDir, '.flens');
   let lCurrentProjectFile = path.join(lFlensDir, 'current_project.json');
 
+  // Check if the current project file exists
   if (!fs.existsSync(lCurrentProjectFile)) {
     throw new Error('❌ No active project set. Run "flens project use" first.');
   }
-
-  return JSON.parse(fs.readFileSync(lCurrentProjectFile, 'utf-8')) as ldProjectConfig;
+  // Read and parse the JSON file to return project configuration details
+  return JSON.parse(fs.readFileSync(lCurrentProjectFile, 'utf-8')) as iProjectConfig;
 }
 
 // Ensure the directory exists, create if not.
 function fnEnsureDirectoryExists(iDirPath: string): void {
+  // Check if the directory exists
   if (!fs.existsSync(iDirPath)) {
+    // Create the directory along with any missing parent directories
     fs.mkdirSync(iDirPath, { recursive: true });
   }
 }
@@ -42,57 +47,69 @@ async function fnFetchData(iUrl: string, idRequestOptions: RequestInit): Promise
   return ldResponse.json();
 }
 
-// This function manipulate the response got from the API request
-async function fnProcessWrite(idData: any, iRepoPath: string, lSiteName: string, idRequestOptions: any, iResource: string): Promise<void> {
+function fnWriteMetaFile (iFolderPath: string, idDocDetails: any){
+  let lJsonFileNAme = path.join(iFolderPath, `${idDocDetails.name}.json`);
+  let ldJsonData = { ...idDocDetails };
+  fs.writeFileSync(lJsonFileNAme, JSON.stringify(ldJsonData, null, 2));
+}
+
+// This function processes the response received from an API request 
+// and writes the data to appropriate files based on the resource type.
+async function fnProcessWrite(idData: any, iRepoPath: string, siteName: string, idRequestOptions: any, iResource: string): Promise<void> {
   // check whether the resource is Clinet or Server Script
   if (iResource === 'client_script' || iResource === 'server_script') {
-
+    // Iterate over each document in the response data
     idData.data.forEach((ldDocumentDetails: any) => {
+      // If the resource is a Server Script and the script type is "API", 
+      // store the script inside an "api" directory.
       if ( iResource === 'server_script' &&  ldDocumentDetails.script_type === 'API' ) {
-        let lRootFolder = path.join(iRepoPath, 'api');
+        let lRootFolder = path.join(iRepoPath, 'api'); // Define the root folder for API scripts
         fnEnsureDirectoryExists(lRootFolder);
+        // Generate a folder name based on the script name (lowercased and spaces replaced with underscores)
         let lFolderName = ldDocumentDetails.name.toLowerCase().replace(/\s+/g, '_');
         let lFolderPath = path.join(lRootFolder, lFolderName);
         fnEnsureDirectoryExists(lFolderPath);
-
-        let scriptFileName = path.join(lFolderPath, `${ldDocumentDetails.name}.py`);
+        // Define the script file path with a .py extension
+        let lScriptFileName = path.join(lFolderPath, `${ldDocumentDetails.name}.py`);
+        // If script content exists, write it to the file
         if (ldDocumentDetails.script) { 
-          fs.writeFileSync(scriptFileName, ldDocumentDetails.script || '');
+          fs.writeFileSync(lScriptFileName, ldDocumentDetails.script || '');
         }
-
-        let llJsonFileNAme = path.join(lFolderPath, `${ldDocumentDetails.name}.json`);
-        let ldJsonData = { ...ldDocumentDetails };
-        fs.writeFileSync(llJsonFileNAme, JSON.stringify(ldJsonData, null, 2));
+        // Write additional metadata related to the script
+        fnWriteMetaFile(lFolderPath, ldDocumentDetails);
       }
-      let doctype = ldDocumentDetails.reference_doctype || ldDocumentDetails.dt || ldDocumentDetails.ref_doctype;
-      if (!doctype) return; // Skip if no doctype key is found
-
-      let lRootFolder = path.join(iRepoPath, 'doctype', doctype.toLowerCase().replace(/\s+/g, '_'));
+      // Determine the document type (doctype) from the response
+      let lDoctype = ldDocumentDetails.reference_doctype || ldDocumentDetails.dt || ldDocumentDetails.ref_doctype;
+      if (!lDoctype) return; // Skip if no doctype key is found
+      // Construct the root folder path based on the doctype
+      let lRootFolder = path.join(iRepoPath, 'doctype', lDoctype.toLowerCase().replace(/\s+/g, '_'));
       fnEnsureDirectoryExists(lRootFolder);
       let lFolderName = ldDocumentDetails.name.toLowerCase().replace(/\s+/g, '_');
       let lFolderPath = path.join(lRootFolder, iResource, lFolderName);
       fnEnsureDirectoryExists(lFolderPath);
-
-      let scriptFileName = path.join(lFolderPath, `${ldDocumentDetails.name}.${iResource === 'client_script' ? 'js' : 'py'}`);
+      // Define the script file name with appropriate extension (JavaScript for client scripts, Python for server scripts)
+      let lScriptFileName = path.join(lFolderPath, `${ldDocumentDetails.name}.${iResource === 'client_script' ? 'js' : 'py'}`);
       if (ldDocumentDetails.script) { 
-        fs.writeFileSync(scriptFileName, ldDocumentDetails.script || '');
+        fs.writeFileSync(lScriptFileName, ldDocumentDetails.script || '');
       }
-
-      let lJsonFileNAme = path.join(lFolderPath, `${ldDocumentDetails.name}.json`);
-      let ldJsonData = { ...ldDocumentDetails };
-      fs.writeFileSync(lJsonFileNAme, JSON.stringify(ldJsonData, null, 2));
+      // Write additional metadata related to the script
+      fnWriteMetaFile(lFolderPath, ldDocumentDetails);
       });
   } else {
+    // If the resource is neither a Client Script nor a Server Script,
     for (let ldItem of idData.data) {
       try {
+        // Fetch additional details for each resource item from the API
         let ldDetails = await fnFetchData(
-          `${lSiteName}/api/resource/${iResource}/${ldItem.name}?fields=["*"]`,
+          `${siteName}/api/resource/${iResource}/${ldItem.name}?fields=["*"]`,
           idRequestOptions
         );
         let lResourceName = iResource.toLowerCase().replace(/\s+/g, '_');
+        // If the resource type is "Report", save it using a specialized function
         if (iResource == 'Report') {
           await fnSaveReport(ldDetails.data, iRepoPath, lResourceName);
         } else {
+          // Save the resource data using the standard writing function
           await fnSaveWrite(ldDetails, iRepoPath, lResourceName)
         }
       } catch (err) {
@@ -102,89 +119,108 @@ async function fnProcessWrite(idData: any, iRepoPath: string, lSiteName: string,
   }
 }
 
-// This function is used to save the data of all resource except
-// Report in the current folder structure.
+// This function is responsible for saving resource data into a structured folder format,  
+// except for 'Report' resources. It ensures directories exist and writes metadata files  
+// for different resource types. 
 async function fnSaveWrite(idData: any, iRepoPath: string, lResourceName: string) {
+  // Special case: If the resource is 'letter_head', store it directly in a named folder 
   if (lResourceName == 'letter_head') {
     let lRootFolder = path.join(iRepoPath, lResourceName);
     fnEnsureDirectoryExists(lRootFolder);
+    // Format the folder name by converting it to lowercase and replacing spaces with underscores  
     let lFolderName = idData.data.name.toLowerCase().replace(/\s+/g, '_');
     let lFolderPath = path.join(lRootFolder, lFolderName);
     fnEnsureDirectoryExists(lFolderPath);
-    let lJsonFileNAme = path.join(lFolderPath, `${idData.data.name}.json`);
-    fs.writeFileSync(lJsonFileNAme, JSON.stringify({ ...idData.data }, null, 2));
+    // Write the metadata file for the letter head 
+    fnWriteMetaFile(lFolderPath, idData.data);
   } else {
+    // Check if the provided data is an array (multiple documents)  
       if (Array.isArray(idData.data)) {
         idData.data.forEach((ldDocumentDetails: any) => {
-          let doctype = ldDocumentDetails.reference_doctype || ldDocumentDetails.dt || ldDocumentDetails.ref_doctype || ldDocumentDetails.doc_type;
-          if (!doctype) return; // Skip if no doctype key is found
-
-          let lRootFolder = path.join(iRepoPath, 'doctype', doctype.toLowerCase().replace(/\s+/g, '_'));
+          // Determine the document type using different possible keys  
+          let lDoctype = ldDocumentDetails.reference_doctype || ldDocumentDetails.dt || ldDocumentDetails.ref_doctype || ldDocumentDetails.doc_type;
+          if (!lDoctype) return; // Skip if no doctype key is found
+          let lRootFolder = path.join(iRepoPath, 'doctype', lDoctype.toLowerCase().replace(/\s+/g, '_'));
           fnEnsureDirectoryExists(lRootFolder);
+          // Format and define the folder path for the resource  
           let lFolderName = ldDocumentDetails.name.toLowerCase().replace(/\s+/g, '_');
           let lFolderPath = path.join(lRootFolder, lResourceName.toLowerCase().replace(/\s+/g, '_'), lFolderName);
           fnEnsureDirectoryExists(lFolderPath);
-
-          let lJsonFileNAme = path.join(lFolderPath, `${ldDocumentDetails.name}.json`);
-          let ldJsonData = { ...ldDocumentDetails};
-          fs.writeFileSync(lJsonFileNAme, JSON.stringify(ldJsonData, null, 2));
+          // Write the metadata file for the document 
+          fnWriteMetaFile(lFolderPath, ldDocumentDetails);
         })
       } else {
+        // Special case: If the resource is 'doctype', create an additional nested directory 
           if (lResourceName == 'doctype') {
             let lRootFolder = path.join(iRepoPath, 'doctype', idData.data.name.toLowerCase().replace(/\s+/g, '_'));
             fnEnsureDirectoryExists(lRootFolder);
             let lFolderName = idData.data.doctype.toLowerCase().replace(/\s+/g, '_');
             let lFolderPath = path.join(lRootFolder, lFolderName);
             fnEnsureDirectoryExists(lFolderPath);
-            let dirName = idData.data.name.toLowerCase().replace(/\s+/g, '_');
-            let dirPath = path.join(lFolderPath, dirName);
-            fnEnsureDirectoryExists(dirPath);
-            let lJsonFileNAme = path.join(dirPath, `${idData.data.name}.json`);
-            let ldJsonData = { ...idData.data};
-            fs.writeFileSync(lJsonFileNAme, JSON.stringify(ldJsonData, null, 2));
+            let lDirName = idData.data.name.toLowerCase().replace(/\s+/g, '_');
+            let lDirPath = path.join(lFolderPath, lDirName);
+            fnEnsureDirectoryExists(lDirPath);
+            // Write the metadata file inside the final nested directory 
+            fnWriteMetaFile(lDirPath, idData.data);
           }
-          let doctype = idData.data.reference_doctype || idData.data.dt || idData.data.ref_doctype || idData.data.doc_type;
-          if (!doctype) return; // Skip if no doctype key is found
-
-          let lRootFolder = path.join(iRepoPath, 'doctype', doctype.toLowerCase().replace(/\s+/g, '_'));
+          let lDoctype = idData.data.reference_doctype || idData.data.dt || idData.data.ref_doctype || idData.data.doc_type;
+          if (!lDoctype) return; // Skip if no doctype key is found
+          let lRootFolder = path.join(iRepoPath, 'doctype', lDoctype.toLowerCase().replace(/\s+/g, '_'));
           fnEnsureDirectoryExists(lRootFolder);
           let lFolderName = idData.data.name.toLowerCase().replace(/\s+/g, '_');
           let lFolderPath = path.join(lRootFolder, lResourceName.toLowerCase().replace(/\s+/g, '_'), lFolderName);
           fnEnsureDirectoryExists(lFolderPath);
-
-          let lJsonFileNAme = path.join(lFolderPath, `${idData.data.name}.json`);
-          let ldJsonData = { ...idData.data};
-          fs.writeFileSync(lJsonFileNAme, JSON.stringify(ldJsonData, null, 2));
+          // Write the metadata file for the document 
+          fnWriteMetaFile(lFolderPath, idData.data);
       }
   }
 }
 
-// This function write the data of only Report resource.
+// This function saves the data of a Report resource by creating a structured  
+// folder hierarchy and writing metadata along with related script files.
 async function fnSaveReport(ldDocumentDetails: any, iRepoPath: string, iResource: string): Promise<void> {
-  let doctype = ldDocumentDetails.reference_doctype || ldDocumentDetails.dt || ldDocumentDetails.ref_doctype;
-      if (!doctype) return; // Skip if no doctype key is found
-
-      let lRootFolder = path.join(iRepoPath, 'doctype', doctype.toLowerCase().replace(/\s+/g, '_'));
-      fnEnsureDirectoryExists(lRootFolder);
-      let lFolderName = ldDocumentDetails.name.toLowerCase().replace(/\s+/g, '_');
-      let lFolderPath = path.join(lRootFolder, iResource, lFolderName);
-      fnEnsureDirectoryExists(lFolderPath);
-
-  let lJsonFileNAme = path.join(lFolderPath, `${ldDocumentDetails.name}.json`);
-  fs.writeFileSync(lJsonFileNAme, JSON.stringify({ ...ldDocumentDetails }, null, 2));
-
+  // Determine the document type using different possible keys  
+  let lDoctype = ldDocumentDetails.reference_doctype || ldDocumentDetails.dt || ldDocumentDetails.ref_doctype;
+      if (!lDoctype) return; // Skip if no doctype key is found
+  // Define the root folder for the doctype  
+  let lRootFolder = path.join(iRepoPath, 'doctype', lDoctype.toLowerCase().replace(/\s+/g, '_'));
+  fnEnsureDirectoryExists(lRootFolder);
+  let lFolderName = ldDocumentDetails.name.toLowerCase().replace(/\s+/g, '_');
+  let lFolderPath = path.join(lRootFolder, iResource, lFolderName);
+  fnEnsureDirectoryExists(lFolderPath);
+  // Write the metadata file for the report 
+  fnWriteMetaFile(lFolderPath, ldDocumentDetails);
+  // If the report has a Python script, save it as a `.py` file  
   if (ldDocumentDetails.report_script) {
     fs.writeFileSync(path.join(lFolderPath, `${ldDocumentDetails.name}.py`), ldDocumentDetails.report_script);
   }
+  // If the report has JavaScript code, save it as a `.js` file 
   if (ldDocumentDetails.javascript) {
     fs.writeFileSync(path.join(lFolderPath, `${ldDocumentDetails.name}.js`), ldDocumentDetails.javascript);
   }
+  // If the report has a SQL query, save it as a `.sql` file  
   if (ldDocumentDetails.query) {
     fs.writeFileSync(path.join(lFolderPath, `${ldDocumentDetails.name}.sql`), ldDocumentDetails.query);
   }
 }
 
+// This function writes the metadata file in json
+// in the desired folder
+function fnWriteLogFile(iRepoPath: string, iaChangeLog: string[]){
+  // Define the log directory and file path
+  let lLogDir = path.join(iRepoPath, 'log');
+  let lLogFile = path.join(lLogDir, 'changelog.txt');
+
+  // Ensure the log directory exists
+  if (!fs.existsSync(lLogDir)) {
+    fs.mkdirSync(lLogDir, { recursive: true });
+  }
+  // Write the changelog file
+  fs.writeFileSync(lLogFile, iaChangeLog.join('\n'), 'utf-8');
+}
+
 export default class clRepoHygieneCommand extends Command {
+  // description and flags are keywords
   static description = 'Check whether local IDE is in sync with the local LENS instance.';
 
   static flags = {
@@ -194,47 +230,47 @@ export default class clRepoHygieneCommand extends Command {
   async run(): Promise<void> {
     console.log('🚀 Running hygiene checks ...');
     let ldProject = fnGetActiveProject();
-    let { lSiteName, lKey, lRepoName } = ldProject;
+    let { siteName, key, repoName } = ldProject;
     let lHomeDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
-    let lRepoPath = path.join(lHomeDir, 'repositories', lRepoName);
+    let lRepoPath = path.join(lHomeDir, 'repositories', repoName);
     fnEnsureDirectoryExists(lRepoPath);
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
     
-    let headers = new Headers({ Authorization: lKey });
+    let headers = new Headers({ Authorization: key });
     let ldRequestOptions: RequestInit = { method: 'GET', headers, redirect: 'follow' };
     
     try {
-
       // Fetch data for each resource and write using suitable write function
-      let ldClientScriptData = await fnFetchData(`${lSiteName}/api/resource/Client Script?fields=["*"]&limit_page_length=0`, ldRequestOptions);
-      await fnProcessWrite(ldClientScriptData, lRepoPath, lSiteName, ldRequestOptions, 'client_script');
+      let ldClientScriptData = await fnFetchData(`${siteName}/api/resource/Client Script?fields=["*"]&limit_page_length=0`, ldRequestOptions);
+      await fnProcessWrite(ldClientScriptData, lRepoPath, siteName, ldRequestOptions, 'client_script');
 
-      let ldServerScriptData = await fnFetchData(`${lSiteName}/api/resource/Server Script?fields=["*"]&limit_page_length=0`, ldRequestOptions);
-      await fnProcessWrite(ldServerScriptData, lRepoPath, lSiteName, ldRequestOptions, 'server_script');
+      let ldServerScriptData = await fnFetchData(`${siteName}/api/resource/Server Script?fields=["*"]&limit_page_length=0`, ldRequestOptions);
+      await fnProcessWrite(ldServerScriptData, lRepoPath, siteName, ldRequestOptions, 'server_script');
       
-      let ldReportData = await fnFetchData(`${lSiteName}/api/resource/Report?fields=["*"]&filters={\"is_standard\": \"No\", \"disabled\":0}&limit_page_length=0`, ldRequestOptions);
-      await fnProcessWrite(ldReportData, lRepoPath, lSiteName, ldRequestOptions, 'Report');
+      let ldReportData = await fnFetchData(`${siteName}/api/resource/Report?fields=["*"]&filters={\"is_standard\": \"No\", \"disabled\":0}&limit_page_length=0`, ldRequestOptions);
+      await fnProcessWrite(ldReportData, lRepoPath, siteName, ldRequestOptions, 'Report');
 
-      let ldLetterHeadData = await fnFetchData(`${lSiteName}/api/resource/Letter Head?fields=["*"]&filters={\"disabled\":0}&limit_page_length=0`, ldRequestOptions);
-      await fnProcessWrite(ldLetterHeadData, lRepoPath, lSiteName, ldRequestOptions, 'Letter Head');
+      let ldLetterHeadData = await fnFetchData(`${siteName}/api/resource/Letter Head?fields=["*"]&filters={\"disabled\":0}&limit_page_length=0`, ldRequestOptions);
+      await fnProcessWrite(ldLetterHeadData, lRepoPath, siteName, ldRequestOptions, 'Letter Head');
 
-      let ldPrintFormatData = await fnFetchData(`${lSiteName}/api/resource/Print Format?fields=["*"]&filters={\"standard\": \"No\", \"disabled\":0}&limit_page_length=0`, ldRequestOptions);
-      await fnProcessWrite(ldPrintFormatData, lRepoPath, lSiteName, ldRequestOptions, 'Print Format');
+      let ldPrintFormatData = await fnFetchData(`${siteName}/api/resource/Print Format?fields=["*"]&filters={\"standard\": \"No\", \"disabled\":0}&limit_page_length=0`, ldRequestOptions);
+      await fnProcessWrite(ldPrintFormatData, lRepoPath, siteName, ldRequestOptions, 'Print Format');
 
-      let ldPropertySetterData = await fnFetchData(`${lSiteName}/api/resource/Property Setter?fields=["*"]&limit_page_length=0`, ldRequestOptions);
+      let ldPropertySetterData = await fnFetchData(`${siteName}/api/resource/Property Setter?fields=["*"]&limit_page_length=0`, ldRequestOptions);
       await fnSaveWrite(ldPropertySetterData, lRepoPath, 'Property Setter');
 
-      let ldCustomFieldData = await fnFetchData(`${lSiteName}/api/resource/Custom Field?fields=["*"]&limit_page_length=0`, ldRequestOptions);
+      let ldCustomFieldData = await fnFetchData(`${siteName}/api/resource/Custom Field?fields=["*"]&limit_page_length=0`, ldRequestOptions);
       await fnSaveWrite(ldCustomFieldData, lRepoPath, 'Custom Field');
 
-      let ldCustomDoctypeData = await fnFetchData(`${lSiteName}/api/resource/DocType?fields=["*"]&filters={\"module\": \"Custom\"}&limit_page_length=0`, ldRequestOptions);
-      await fnProcessWrite(ldCustomDoctypeData, lRepoPath, lSiteName, ldRequestOptions, 'DocType');
+      let ldCustomDoctypeData = await fnFetchData(`${siteName}/api/resource/DocType?fields=["*"]&filters={\"module\": \"Custom\"}&limit_page_length=0`, ldRequestOptions);
+      await fnProcessWrite(ldCustomDoctypeData, lRepoPath, siteName, ldRequestOptions, 'DocType');
     try {
       // Stage files first to get proper status
       execSync('git add .', { cwd: lRepoPath });
       // Get the changed files of working commit.
       let lGitStatus = execSync('git status --porcelain=v1', { cwd: lRepoPath }).toString().trim();
-      
+      var laChangeLog: string[] = [];
+      var laStatusLines = lGitStatus.split('\n');
       if (lGitStatus) {
         // this create select action as used in other cli commands
         let { lSync } = await inquirer.prompt([
@@ -256,30 +292,16 @@ export default class clRepoHygieneCommand extends Command {
           ]);
           if (lSyncOption === 'Repo to Host') {
             // Process the git status output and create changelog.txt
-            let laChangeLog: string[] = [];
-            let laStatusLines = lGitStatus.split('\n');
-          
             laStatusLines.forEach((lLine) => {
               let lStatusCode = lLine.substring(0, 2).trim(); // Git status code
-              let lFilePath = lLine.substring(3).trim(); // File path
-          
+              let lFilePath = lLine.substring(3).trim(); // File path         
               if (lStatusCode === 'A') {
                 laChangeLog.push(`${lFilePath.padEnd(50)} DELETE`);
               }
             });
-          
-            // Define the log directory and file path
-            let lLogDir = path.join(lRepoPath, 'log');
-            let lLogFile = path.join(lLogDir, 'changelog.txt');
-          
-            // Ensure the log directory exists
-            if (!fs.existsSync(lLogDir)) {
-              fs.mkdirSync(lLogDir, { recursive: true });
-            }
-          
-            // Write the changelog file
-            fs.writeFileSync(lLogFile, laChangeLog.join('\n'), 'utf-8');
-          
+            let lLogFile;
+            // Write the changeLog file
+            fnWriteLogFile(lRepoPath, laChangeLog);
             this.log(`Use flens repo sync command to proceed.`);
           
             // Remove all staged changes except changelog.txt
@@ -296,9 +318,6 @@ export default class clRepoHygieneCommand extends Command {
             }
           } else {
              // Process the git status output and create changelog.txt
-             let laChangeLog: string[] = [];
-             let laStatusLines = lGitStatus.split('\n');
- 
              laStatusLines.forEach((lLine) => {
                let lStatusCode = lLine.substring(0, 2).trim(); // Git status code
                let lFilePath = lLine.substring(3).trim(); // File path
@@ -309,23 +328,12 @@ export default class clRepoHygieneCommand extends Command {
                else if (lStatusCode === 'D') state = 'DELETE';
                else if (lStatusCode === 'R') state = 'RENAME';
                else if (lStatusCode === '??') state = 'UNTRACKED';
- 
                if (state) {
                 laChangeLog.push(`${lFilePath.padEnd(50)} ${state}`);
                }
              });
- 
-             // Define the log directory and file path
-             let lLogDir = path.join(lRepoPath, 'log');
-             let lLogFile = path.join(lLogDir, 'changelog.txt');
- 
-             // Ensure the log directory exists
-             if (!fs.existsSync(lLogDir)) {
-               fs.mkdirSync(lLogDir, { recursive: true });
-             }
- 
-             // Write the changelog file
-             fs.writeFileSync(lLogFile, laChangeLog.join('\n'), 'utf-8');
+             // Write the changeLog file
+             fnWriteLogFile(lRepoPath, laChangeLog);
              execSync('git add .', { cwd: lRepoPath });
              this.log(`The changes are staged in the repo. Create a new commit to proceed.`)
           }
@@ -342,7 +350,7 @@ export default class clRepoHygieneCommand extends Command {
         this.log(`No change is detected. Your Instance is in sync with IDE.`);
       } 
     } catch (error) {
-      this.log(`Error checking Git status for ${lSiteName}: ${(error as Error).message}`);
+      this.log(`Error checking Git status for ${siteName}: ${(error as Error).message}`);
     }
     } catch (error) {
       console.error('❌ Error:', error);

@@ -25,6 +25,7 @@ export default class SyncCommand extends Command {
 
     const requestOptionsPUT: RequestInit = { method: 'PUT', headers: myHeaders, redirect: 'follow' };
     const requestOptionsPOST: RequestInit = { method: 'POST', headers: myHeaders, redirect: 'follow' };
+    const requestOptionsDELETE: RequestInit = { method: 'DELETE', headers: myHeaders, redirect: 'follow' };
 
     const lRepoPath = path.join(homeDir, 'repositories', repoName);
     const rootDirs = ['api', 'letter_head', 'doctype'];
@@ -33,6 +34,11 @@ export default class SyncCommand extends Command {
       if (fs.existsSync(folderPath)) {
         processDirectory(folderPath, requestOptionsPUT, requestOptionsPOST, siteName, root, 1);
       }
+    }
+    // Process changelog for DELETE requests
+    const changelogPath = path.join(lRepoPath, 'log', 'changelog.txt');
+    if (fs.existsSync(changelogPath) && fs.statSync(changelogPath).size > 0) {
+      processChangelog(changelogPath, siteName, requestOptionsDELETE);
     }
   }
 }
@@ -99,6 +105,7 @@ async function processSubdirectory(subDir: string, putOptions: RequestInit, post
     data.javascript = jsFile ? fs.readFileSync(path.join(subDir, jsFile), 'utf-8') : "";
     data.report_script = pyFile ? fs.readFileSync(path.join(subDir, pyFile), 'utf-8') : "";
     data.query = sqlFile ? fs.readFileSync(path.join(subDir, sqlFile), 'utf-8') : "";
+    
   }
   // Handle `client_script` and `server_script` inside `doctype` (third-level)
   if (parentFolder !== 'report') {
@@ -112,6 +119,7 @@ async function processSubdirectory(subDir: string, putOptions: RequestInit, post
   await fetch(url, { ...putOptions, body: JSON.stringify(data) })
     .then(response => {
       if (response.status === 404) {
+        let url = `${siteName}/api/resource/${resourceName}`;
         return fetch(url, { ...postOptions, body: JSON.stringify(data) });
       }
       return response;
@@ -120,4 +128,55 @@ async function processSubdirectory(subDir: string, putOptions: RequestInit, post
     // .then(result => console.log(`${resourceName} synced:`))
     .catch(error => console.error(`Error syncing ${resourceName}:`, error));
 }
+async function processChangelog(changelogPath: string, siteName: string, deleteOptions: any) {
+  const logEntries = fs.readFileSync(changelogPath, 'utf-8').split('\n').filter(line => line.trim().endsWith('DELETE'));
+  const processedEntries = new Set();
+  
+  for (const line of logEntries) {
+    const match = line.match(/^"(.+?)"\s+DELETE$/);
+    if (!match) continue;
 
+    const fullPath = match[1];
+    const parts = fullPath.split('/');
+    if (parts.length < 3) continue;
+
+    const parentDir = parts[0];
+    const fileNameWithExt = parts[parts.length - 1];
+    const fileName = fileNameWithExt.replace(/\.[^/.]+$/, '');
+    const resourceType = parts[parts.length - 2];
+
+    const resourceMap: Record<string, string | Record<string, string>> = {
+      api: 'Server Script',
+      letter_head: 'Letter Head',
+      doctype: {
+        print_format: 'Print Format',
+        custom_field: 'Custom Field',
+        doctype: 'DocType',
+        client_script: 'Client Script',
+        server_script: 'Server Script',
+        property_setter: 'Property Setter',
+        report: 'Report',
+      },
+    };
+
+    let resourceName;
+    if (parentDir !== 'doctype') {
+      resourceName = resourceMap[parentDir];
+    } else if (parentDir === 'doctype' ) {
+      const doctypeMap = resourceMap.doctype as Record<string, string>;
+      resourceName = doctypeMap[parentDir];
+    }
+    if (!resourceName) continue;
+
+    const entryKey = `${resourceName}/${fileName}`;
+    if (processedEntries.has(entryKey)) continue;
+    processedEntries.add(entryKey);
+
+    const url = `${siteName}/api/resource/${resourceName}/${fileName}`;
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+    await fetch(url, deleteOptions)
+      .then(response => response.text())
+      .then(() => console.log(`Deleted: ${resourceName}/${fileName}`))
+      .catch(error => console.error(`Error deleting ${resourceName}/${fileName}:`, error));
+  }
+}
