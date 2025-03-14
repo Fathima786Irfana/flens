@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import fetch from 'node-fetch';
 import { Command, Flags } from '@oclif/core';
+import ora from 'ora';
 
 export default class SyncCommand extends Command {
   static description = 'Syncs Repo with Host';
@@ -29,17 +30,20 @@ export default class SyncCommand extends Command {
 
     const lRepoPath = path.join(homeDir, 'repositories', repoName);
     const rootDirs = ['api', 'letter_head', 'doctype'];
+    const spinner = ora({ text: 'Syncing...\n', spinner: 'dots' }).start();
     for (const root of rootDirs) {
       const folderPath = path.join(lRepoPath, root);
       if (fs.existsSync(folderPath)) {
-        processDirectory(folderPath, requestOptionsPUT, requestOptionsPOST, siteName, root, 1);
+        await processDirectory(folderPath, requestOptionsPUT, requestOptionsPOST, siteName, root, 1);
       }
     }
     // Process changelog for DELETE requests
     const changelogPath = path.join(lRepoPath, 'log', 'changelog.txt');
     if (fs.existsSync(changelogPath) && fs.statSync(changelogPath).size > 0) {
-      processChangelog(changelogPath, siteName, requestOptionsDELETE);
+      spinner.text = '📄 Deleting Host Resource not in Repo...';
+      await processChangelog(changelogPath, siteName, requestOptionsDELETE);
     }
+    spinner.succeed('Sync Completed Successfully!\n');
   }
 }
 
@@ -129,13 +133,12 @@ async function processSubdirectory(subDir: string, putOptions: RequestInit, post
     .catch(error => console.error(`Error syncing ${resourceName}:`, error));
 }
 async function processChangelog(changelogPath: string, siteName: string, deleteOptions: any) {
-  const logEntries = fs.readFileSync(changelogPath, 'utf-8').split('\n').filter(line => line.trim().endsWith('DELETE') && !line.startsWith('log/')); // Ignore lines starting with "log/"
+  const logEntries = fs.readFileSync(changelogPath, 'utf-8').split('\n').filter(line => line.trim().endsWith('DELETE')); // Ignore lines starting with "log/"
   const processedEntries = new Set();
   
   for (const line of logEntries) {
-    const match = line.match(/^"(.+?)"\s+DELETE$/);
+    const match = line.match(/^"?(.+?)"?\s+DELETE$/);
     if (!match) continue;
-
     const fullPath = match[1];
     const parts = fullPath.split('/');
     if (parts.length < 3) continue;
@@ -167,16 +170,14 @@ async function processChangelog(changelogPath: string, siteName: string, deleteO
       resourceName = doctypeMap[parentDir];
     }
     if (!resourceName) continue;
-
     const entryKey = `${resourceName}/${fileName}`;
     if (processedEntries.has(entryKey)) continue;
     processedEntries.add(entryKey);
-
     const url = `${siteName}/api/resource/${resourceName}/${fileName}`;
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     await fetch(url, deleteOptions)
       .then(response => response.text())
-      .then(() => console.log(`Deleted: ${resourceName}/${fileName}`))
-      .catch(error => console.error(`Error deleting ${resourceName}/${fileName}:`, error));
+      .then(() => console.log(`\nDeleted: ${resourceName}/${fileName}`))
+      .catch(error => console.error(`\nError deleting ${resourceName}/${fileName}:`, error));
   }
 }
