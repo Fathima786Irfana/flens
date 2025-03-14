@@ -273,6 +273,8 @@ export default class clRepoHygieneCommand extends Command {
       var laStatusLines = lGitStatus.split('\n');
       if (lGitStatus) {
         // this create select action as used in other cli commands
+        // This inquirer method will prompt the message to the user and
+        // wait for the user input.
         let { lSync } = await inquirer.prompt([
           {
             type: 'list',
@@ -322,14 +324,14 @@ export default class clRepoHygieneCommand extends Command {
                let lStatusCode = lLine.substring(0, 2).trim(); // Git status code
                let lFilePath = lLine.substring(3).trim(); // File path
               // Map the status code with understandable format
-               let state = '';
-               if (lStatusCode === 'A') state = 'INSERT';
-               else if (lStatusCode === 'M') state = 'UPDATE';
-               else if (lStatusCode === 'D') state = 'DELETE';
-               else if (lStatusCode === 'R') state = 'RENAME';
-               else if (lStatusCode === '??') state = 'UNTRACKED';
-               if (state) {
-                laChangeLog.push(`${lFilePath.padEnd(50)} ${state}`);
+               let lState = '';
+               if (lStatusCode === 'A') lState = 'INSERT';
+               else if (lStatusCode === 'M') lState = 'UPDATE';
+               else if (lStatusCode === 'D') lState = 'DELETE';
+               else if (lStatusCode === 'R') lState = 'RENAME';
+               else if (lStatusCode === '??') lState = 'UNTRACKED';
+               if (lState) {
+                laChangeLog.push(`${lFilePath.padEnd(50)} ${lState}`);
                }
              });
              // Write the changeLog file
