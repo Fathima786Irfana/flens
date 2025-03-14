@@ -7,14 +7,14 @@ import { execSync } from 'child_process';
 import inquirer from 'inquirer';
 
 // Define an interface for the project configuration
-interface iProjectConfig {
+interface IprojectConfig {
   siteName: string; // Name of the site associated with the project (default variable name used in project)
   key: string; // Unique key for the project (default variable name used in project)
   repoName: string; // Repository name linked to the project (default variable name used in project)
 }
 
 // Fetch the variable details from the active project set in the cli.
-function fnGetActiveProject(): iProjectConfig {
+function fnGetActiveProject(): IprojectConfig {
   // Determine the home directory path based on the OS environment variables
   // home/.<cli-name>/current_project.jsoon
   let lHomeDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
@@ -26,7 +26,7 @@ function fnGetActiveProject(): iProjectConfig {
     throw new Error('❌ No active project set. Run "flens project use" first.');
   }
   // Read and parse the JSON file to return project configuration details
-  return JSON.parse(fs.readFileSync(lCurrentProjectFile, 'utf-8')) as iProjectConfig;
+  return JSON.parse(fs.readFileSync(lCurrentProjectFile, 'utf-8')) as IprojectConfig;
 }
 
 // Ensure the directory exists, create if not.
