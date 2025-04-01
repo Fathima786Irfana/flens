@@ -3,205 +3,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
 import inquirer from 'inquirer';
-
-// This is a function to extract the required versions of
-// Frappe and Erpnext from the India Compliance app for
-// their compactibility
-function fnExtractRequiredVersions(lPyFilePath: string, lSelectedMajor: string) {
-  if (!fs.existsSync(lPyFilePath)) {
-      console.log(`❌ File not found: ${lPyFilePath}`);
-      return {};
-  }
-  let lContent = fs.readFileSync(lPyFilePath, 'utf-8');
-
-  // Remove "v" from selectedMajor if present
-  let lMajorVersion = lSelectedMajor.replace(/^v/, '');
-
-  // Regex to match the app details part present in the
-  // check_version_compatibility.py file
-  let lVersionRegex = /"app_name":\s*"([^"]+)",\s*"current_version":[^}]+?"required_versions":\s*({[^}]+})/gs;
-  let ldVersions: Record<string, string> = {};
-
-  let laMatch;
-  while ((laMatch = lVersionRegex.exec(lContent)) !== null) {
-      let lAppName = laMatch[1]; // Extract app name
-      let laVersionsDict = JSON.parse(laMatch[2].replace(/'/g, '"')); // Fix single quotes
-
-      let lRequiredVersionKey = `version-${lMajorVersion}`;
-
-      // Ensure the required_version starts with majorVersion
-      if (laVersionsDict[lRequiredVersionKey] && laVersionsDict[lRequiredVersionKey].startsWith(lMajorVersion)) {
-        ldVersions[lAppName] = laVersionsDict[lRequiredVersionKey];
-      }
-  }
-  return ldVersions;
-}
-
-// Compare the tags selected for identifing the closer one
-function fnCompareVersions(v1: string, v2: string): number {
-  let lParseVersion = (v: string) => v.replace(/^v/, '').split('.').map(Number);
-  let [a1, a2, a3] = lParseVersion(v1);
-  let [b1, b2, b3] = lParseVersion(v2);
-  return a1 - b1 || a2 - b2 || a3 - b3; // Compare major, minor, patch
-}
-
-// Filter the tags based on the Date of ERPNExt or Frappe
-function fnGetClosestTag(lAppPath: string, lReferenceDate: Date): string | null {
-  try {
-    let lAllTags = execSync(`git -C ${lAppPath} tag --sort=-v:refname`, { encoding: 'utf-8' })
-      .trim()
-      .split('\n')
-      .filter(tag => tag);
-    let lClosestTag: string | null = null;
-    let lClosestDateDiff = Infinity;
-    for (let lTag of lAllTags) {
-      let lTagDateStr = execSync(`git -C ${lAppPath} log -1 --format=%ai ${lTag}`, { encoding: 'utf-8' })
-        .trim()
-        .split(' ')[0];
-      let lTagDate = new Date(lTagDateStr);
-      let lDateDiff = lTagDate.getTime() - lReferenceDate.getTime();
-
-      if (lDateDiff >= 0 && lDateDiff < lClosestDateDiff) { // Only future tags
-        lClosestTag = lTag;
-        lClosestDateDiff = lDateDiff;
-      }
-    }
-    return lClosestTag;
-  } catch (error: any) {
-    console.error(`❌ Failed to get tags for ${lAppPath}: ${error.message}`);
-    return null;
-  }
-}
-// Ensure whether Apps repo exist in Locally or else clone it
-let fnEnsureRepoExists = (lAppUrl: string, lRepositoriesPath: string): { lAppName: string, lAppPath: string } => {
-  let lAppName = path.basename(lAppUrl, '.git');
-  let lAppPath = path.join(lRepositoriesPath, lAppName);
-  if (!fs.existsSync(lAppPath)) {
-    execSync(`git clone ${lAppUrl} ${lAppPath}`, { stdio: 'ignore' });
-  } else {
-    execSync(`git -C ${lAppPath} pull`, { stdio: 'ignore' });
-  }
-  return { lAppName, lAppPath }; // Return both appName and appPath
-};
-// Reead the apps present in the apps.json file
-let fnReadAppsJson = (lLensdockerPath: string): { url: string; branch: string }[] | null => {
-  let lAppsJsonPath = path.join(lLensdockerPath, 'ci', 'apps.json');
-  if (!fs.existsSync(lAppsJsonPath)) {
-    console.log('❌ apps.json file not found.');
-    return null;
-  }
-  return JSON.parse(fs.readFileSync(lAppsJsonPath, 'utf-8'));
-};
-// It checkout the lensdocker repo to the correct release brach we asked
-let fnCheckoutAndPullBranch = (lRepoPath: string, lBranch: string): void => {
-  try {
-    execSync(`git -C ${lRepoPath} checkout ${lBranch}`, { stdio: 'ignore' });
-    execSync(`git -C ${lRepoPath} pull`, { stdio: 'ignore' });
-  } catch (error: any) {
-    console.error(`❌ Failed to checkout and pull branch "${lBranch}" in ${lRepoPath}: ${error.message}`);
-  }
-};
-// It gets the date of the tag selected
-function fnGetTagDate(lRepoPath: string, lVersion: string): Date | null {
-  try {
-    let lTagDateStr = execSync(
-      `git -C ${lRepoPath} log -1 --format=%ai ${lVersion}`,
-      { encoding: 'utf-8' }
-    )
-      .trim()
-      .split(' ')[0];
-
-    return new Date(lTagDateStr);
-  } catch (error: any) {
-    console.error(`❌ Failed to get date for Frappe version ${lVersion}: ${error.message}`);
-    return null;
-  }
-}
-// Display the apps and its tag in the terminal.
-function fnDisplayAppTags(appTags: Record<string, string>): void {
-  if (Object.keys(appTags).length > 0) {
-    Object.entries(appTags).forEach(([app, tag]) => {
-      console.log(`🔹 ${app}: ${tag}`);
-    });
-  }
-}
-
-async function fnPromptUser(lUpgradeDate: string, lDayLimit: number, lAppPath: string, lMajorVersion: string, lAppName: string) {
-  let lSelectedTag = '';
-  let lSelectedDate = '';
-  let lDiffDays = 0;
-  let lDirection = "";
-  let lAnswer: any ;
-  
-  if (lAppName === 'frappe') {
-    // Prompt user for confirmation
-    lAnswer = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'lUseLatestTag',
-        message: `⚠️ No tag found for Frappe for the exact date of ERPNext. Do you want to proceed with the latest available tag to the date as Possible?`,
-        default: false,
-      },
-    ]);
-  }
-  else {
-    // Prompt user for confirmation
-    lAnswer = await inquirer.prompt([
-      {
-        type: 'confirm',
-        name: 'lUseLatestTag',
-        message: `⚠️ No tag found for date ${lUpgradeDate} or within ${lDayLimit} days for major version ${lMajorVersion} of app ${lAppName}. Do you want to proceed with the latest available tag to the date as Possible?`,
-        default: false,
-      },
-    ]);
-  }
-
-  if (!lAnswer.lUseLatestTag) {
-    console.log('❌ Exiting the process. No version is selected');
-    process.exit(1);
-  }
-
-  // Fetch all tags matching the major version pattern
-  let lLastTags = execSync(`git -C ${lAppPath} tag --list "${lMajorVersion}.*"`, { encoding: 'utf-8' })
-    .trim()
-    .split('\n');
-
-  if (lLastTags.length === 0) {
-    console.log('❌ No tags found in repository.');
-    process.exit(1);
-  }
-
-  // Find the closest tag AFTER the upgrade date
-  for (let lTag of lLastTags) {
-    let lTagDateStr = execSync(`git -C ${lAppPath} log -1 --format=%ai ${lTag}`, { encoding: 'utf-8' })
-      .trim()
-      .split(' ')[0];
-    let lTagDate = new Date(lTagDateStr);
-    // Calculate the difference in days
-    let lTimeDiff = lTagDate.getTime() - new Date(lUpgradeDate).getTime();
-    let tempDiffDays = Math.ceil(Math.abs(lTimeDiff) / (1000 * 60 * 60 * 24)); // Convert ms to days
-    let tempDirection = lTimeDiff > 0 ? "after" : "before"; // Determine if it's before or after
-    // Check if this tag is the closest one AFTER the upgrade date
-    if (!lSelectedTag || Math.abs(lTagDate.getTime() - new Date(lUpgradeDate).getTime()) < Math.abs(new Date(lSelectedDate!).getTime() - new Date(lUpgradeDate).getTime())) {
-      lSelectedTag = lTag;
-      lSelectedDate = lTagDateStr;
-      lDiffDays = tempDiffDays;
-      lDirection = tempDirection;
-    }
-  }
-
-  // If no tag is selected, exit
-  if (!lSelectedTag) {
-    console.log('❌ No valid tag found.');
-    process.exit(1);
-  }
-  
-  // Store the selected tag in the object
-  let ldTagData: { [lKey: string]: { lTag: string, lDate: string } } = {};
-  ldTagData[lAppName] = { lTag: `${lSelectedTag} - This tag is ${lDiffDays} day(s) ${lDirection} the asked update date ${lUpgradeDate}`, lDate: lSelectedDate };
-
-  return ldTagData[lAppName];
-}
+import {fnExtractRequiredVersions, fnCompareVersions,
+  fnGetClosestTag, fnEnsureRepoExists, fnReadAppsJson,
+  fnCheckoutAndPullBranch, fnGetTagDate, fnDisplayAppTags, fnPromptUser
+} from '../../functions/upgrade-functions.js';
 
 export default class clVersionUpgrade extends Command {
   static description = 'Upgrade a Release Group';
@@ -339,8 +144,7 @@ export default class clVersionUpgrade extends Command {
           // Find closest valid tags
           let ldExtraAppTags: Record<string, string> = {}; // Moved outside try block
           // Get the version of the apps (dependent of ERPNext) that are not in the -ind release but
-          // in the release group asked
-          // using ERPNext tag and its version
+          // in the release group asked using ERPNext tag and its version
           laFilteredExtraApps.forEach(lAppUrl => {
             let { lAppName, lAppPath } = fnEnsureRepoExists(lAppUrl, lRepositoriesPath);
             let lClosestTag = fnGetClosestTag(lAppPath, lErpnextTagDate);
@@ -355,8 +159,7 @@ export default class clVersionUpgrade extends Command {
           // Store selected tags for excluded extra apps
           let ldExcludedAppTags: Record<string, string> = {};
           // Get the version of the apps (dependent of Frappe) that are not in the -ind release but
-          // in the release group asked
-          //  using Frappe tag and its version
+          // in the release group asked using Frappe tag and its version
           laExcludedExtraApps.forEach(lAppUrl => {
             let { lAppName, lAppPath } = fnEnsureRepoExists(lAppUrl, lRepositoriesPath);
             let lClosestTag = fnGetClosestTag(lAppPath, lFrappeTagDate);
@@ -378,7 +181,6 @@ export default class clVersionUpgrade extends Command {
 
           // Display extra apps with selected tags
           fnDisplayAppTags(ldExtraAppTags);
-          // Display excluded extra apps with selected tags
           fnDisplayAppTags(ldExcludedAppTags);
       }
     } else {
@@ -398,7 +200,6 @@ export default class clVersionUpgrade extends Command {
             ? (await inquirer.prompt([{ name: 'major', type: 'list', choices: ['v14', 'v15'], message: 'Select major version:' }])).major
             : 'v15';
           }
-        
         // Exclude 'lms' and 'payments' apps but explicitly include 'frappe'
         let laExcludedApps = new Set(['lms', 'payments', 'lens_pdf-on-submit']);
         let laAppNames = ldAppsData
@@ -469,12 +270,10 @@ export default class clVersionUpgrade extends Command {
             let lTagDateStr = execSync(`git -C ${lAppPath} log -1 --format=%ai ${lTag}`, { encoding: 'utf-8' }).trim().split(' ')[0];
             let lTagDate = new Date(lTagDateStr);
             let lTagMonth = lTagDate.getMonth() + 1; // JavaScript months are 0-based
-
+            // Include all tags from September and October (Month & Month+1)
             if (lTagMonth === lUpgradeMonth) {
-              // Include all tags from September, but prioritize before/after the 15th later if needed
               return true;
             } else if (lTagMonth === lUpgradeMonth + 1) {
-              // Only include October (next month)
               return true;
             }
             return false; // Ignore tags from other months
@@ -574,7 +373,7 @@ export default class clVersionUpgrade extends Command {
                 for (let lTag of laFinalFilteredTags) {
                   let lTagDate = execSync(`git -C ${lAppPath} log -1 --format=%ai ${lTag}`, { encoding: 'utf-8' }).trim().split(' ')[0];
                   // Select a tag after erpnext but within the first 15 days of next month if needed
-                  if (lLastErpnextDate && lTagDate <= lLastErpnextDate) continue;
+                  if (lLastErpnextDate && lTagDate < lLastErpnextDate) continue;
                   if (!lTagDate.startsWith(lUpgradeDate.slice(0, 7))) {
                     let lNextMonth = new Date(new Date(lUpgradeDate).setMonth(new Date(lUpgradeDate).getMonth() + 1));
                     if (new Date(lTagDate) > lNextMonth || new Date(lTagDate).getDate() > 15) continue;
@@ -593,16 +392,13 @@ export default class clVersionUpgrade extends Command {
                   let selectedTagData = await fnPromptUser(lUpgradeDate, lDayLimit, lAppPath, lMajorVersion, lAppName);
                   // Store the selected tag
                   ldTagData[lAppName] = selectedTagData;
-                }
-                // If tag is selected add it to the ldTagData dict for future access in the code
-                if (lSelectedTag) {
+                }else {
                   ldTagData[lAppName] = { lTag: lSelectedTag, lDate: lSelectedDate };
                 }
             }
         }
         for (let lAppName of laExcludedApps) {
-          // Since lens-pdf-on-submit our custom app use the default
-          // branch
+          // Since lens-pdf-on-submit is our custom app use the default branch
           if (lAppName === 'lens_pdf-on-submit') {
             ldTagData[lAppName] = { lTag: "workflow-v1", lDate: "" };
           }
@@ -615,7 +411,7 @@ export default class clVersionUpgrade extends Command {
               ldTagData[lAppName] = { lTag: lSelectedTag, lDate: "" };
             }
           }
-          // Logic for lms App -> the tag date should be greater than the ERPNext tag date
+          // Logic for lms App -> the tag date should be equal to/greater than the ERPNext tag date
           if (lAppName === 'lms') {
             let lAppUrl = ldAppsData.find(ldApp => path.basename(ldApp.url, '.git') === lAppName)?.url;
             let lAppPath = path.join(lRepositoriesPath, lAppName);
@@ -655,8 +451,8 @@ export default class clVersionUpgrade extends Command {
               // Store the selected tag
               ldTagData[lAppName] = selectedTagData;
             }
+          }
         }
-                }
         // Display the Apps, its version and Date for the -ind release group asked
         this.log(`\n📢 Selected Tags for Release Group "${lReleaseGroup}":\n`);
         for (let [lAapp, lData] of Object.entries(ldTagData)) {
