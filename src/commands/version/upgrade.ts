@@ -104,8 +104,8 @@ export default class clVersionUpgrade extends Command {
             return;
           }
           // Read the apps from the Apps.json
-          let ldAppsData = fnReadAppsJson(lLensdockerPath);
-          if (!ldAppsData) return; // Handle the case when the file is missing
+          let laAppsData = fnReadAppsJson(lLensdockerPath);
+          if (!laAppsData) return; // Handle the case when the file is missing
           // Get Frappe tag date
           let lFrappeRepoPath = path.join(lRepositoriesPath, 'frappe');
           let lFrappeVer = lFrappeVersionMatch[1];
@@ -115,7 +115,7 @@ export default class clVersionUpgrade extends Command {
           }
 
           // Get ERPNext branch
-          let ldErpnextApp = ldAppsData.find(ldApp => ldApp.url.includes('erpnext'));
+          let ldErpnextApp = laAppsData.find(lApp => lApp.url.includes('erpnext'));
           if (!ldErpnextApp) {
             this.log('❌ ERPNext repository not found in appsData.');
             return;
@@ -135,8 +135,8 @@ export default class clVersionUpgrade extends Command {
           if (!ldReleaseAppsData) return; // Handle the case when the file is missing
 
           // Identify extra apps
-          let ldAppsSet = new Set(ldAppsData.map(ldApp => ldApp.url));
-          let ldExtraApps = ldReleaseAppsData.filter(ldApp => !ldAppsSet.has(ldApp.url)).map(ldApp => ldApp.url);
+          let laAppsSet = new Set(laAppsData.map(lApp => lApp.url));
+          let ldExtraApps = ldReleaseAppsData.filter(lApp => !laAppsSet.has(lApp.url)).map(lApp => lApp.url);
           // Filter out excluded apps
           let laExcludedApps = ['crm', 'insight', 'builder', 'frappe_whatsapp'];
           let laFilteredExtraApps = ldExtraApps.filter(lAppUrl => !laExcludedApps.some(lExclude => lAppUrl.includes(lExclude)));
@@ -170,11 +170,11 @@ export default class clVersionUpgrade extends Command {
 
           // Display applications and its versions
           this.log(`\n📢 Apps for release group "${lReleaseGroup}" based on "${lMappedGroups}":\n`);
-          let ldReleaseAppsSet = new Set(ldReleaseAppsData.map(ldApp => ldApp.url));
-          ldAppsData.forEach(ldApp => {
-            let lAppName = path.basename(ldApp.url, '.git');
-            if (lAppName !== 'india-compliance' && ldReleaseAppsSet.has(ldApp.url)) {
-              this.log(`🔹 ${lAppName}: ${ldApp.branch}`);
+          let ldReleaseAppsSet = new Set(ldReleaseAppsData.map(lApp => lApp.url));
+          laAppsData.forEach(lApp => {
+            let lAppName = path.basename(lApp.url, '.git');
+            if (lAppName !== 'india-compliance' && ldReleaseAppsSet.has(lApp.url)) {
+              this.log(`🔹 ${lAppName}: ${lApp.branch}`);
             }
           });
           this.log(`\n🔹 Frappe Version: ${lFrappeVersion}\n`);
@@ -187,9 +187,9 @@ export default class clVersionUpgrade extends Command {
         // Checkout the lensdocker local repository
         fnCheckoutAndPullBranch(lLensdockerPath, lReleaseGroup);
         // Get the apps stored in the apps.json
-        let ldAppsData = fnReadAppsJson(lLensdockerPath);
-        if (!ldAppsData) return; // Handle the case when the file is missing
-        let ldAppsSet = new Set(ldAppsData.map(ldApp => path.basename(ldApp.url, '.git')));
+        let laAppsData = fnReadAppsJson(lLensdockerPath);
+        if (!laAppsData) return; // Handle the case when the file is missing
+        let laAppsSet = new Set(laAppsData.map(lApp => path.basename(lApp.url, '.git')));
         // Get major version from version.txt
         let lVersionPath = path.join(lLensdockerPath, 'ci', 'version.txt');
         let lMajorVersion = 'v15';
@@ -202,8 +202,8 @@ export default class clVersionUpgrade extends Command {
           }
         // Exclude 'lms' and 'payments' apps but explicitly include 'frappe'
         let laExcludedApps = new Set(['lms', 'payments', 'lens_pdf-on-submit']);
-        let laAppNames = ldAppsData
-          .map(ldApp => path.basename(ldApp.url, '.git'))
+        let laAppNames = laAppsData
+          .map(lApp => path.basename(lApp.url, '.git'))
           .filter(lAppName => !laExcludedApps.has(lAppName));
         
         // Ensure 'frappe' is explicitly included in the applist
@@ -238,7 +238,7 @@ export default class clVersionUpgrade extends Command {
         let lLastErpnextDate = ''; // Store the latest allowed date of ERPNext for other apps
         
         for (let lAppName of laOrderedApps) {
-          let lAppUrl = ldAppsData.find(ldApp => path.basename(ldApp.url, '.git') === lAppName)?.url;
+          let lAppUrl = laAppsData.find(lApp => path.basename(lApp.url, '.git') === lAppName)?.url;
           if (!lAppUrl && lAppName !== 'frappe') continue; // Skip if no URL and not 'frappe'
         
           // Handle 'frappe' separately if not in apps.json
@@ -413,7 +413,7 @@ export default class clVersionUpgrade extends Command {
           }
           // Logic for lms App -> the tag date should be equal to/greater than the ERPNext tag date
           if (lAppName === 'lms') {
-            let lAppUrl = ldAppsData.find(ldApp => path.basename(ldApp.url, '.git') === lAppName)?.url;
+            let lAppUrl = laAppsData.find(lApp => path.basename(lApp.url, '.git') === lAppName)?.url;
             let lAppPath = path.join(lRepositoriesPath, lAppName);
         
             // Clone or pull the repository
@@ -456,7 +456,7 @@ export default class clVersionUpgrade extends Command {
         // Display the Apps, its version and Date for the -ind release group asked
         this.log(`\n📢 Selected Tags for Release Group "${lReleaseGroup}":\n`);
         for (let [lAapp, lData] of Object.entries(ldTagData)) {
-          if (ldAppsSet.has(lAapp) || lAapp === 'frappe') {
+          if (laAppsSet.has(lAapp) || lAapp === 'frappe') {
             let lFormattedDate = lData.lDate.split('T')[0]; // Extract only the date part
             this.log(`🔹 ${lAapp}: ${lData.lTag} (Date: ${lFormattedDate})`);
           }
