@@ -117,10 +117,10 @@ export function fnGetTagDate(lRepoPath: string, lVersion: string): Date | null {
     }
   }
   // Display the apps and its tag in the terminal.
-export function fnDisplayAppTags(appTags: Record<string, string>): void {
-    if (Object.keys(appTags).length > 0) {
-      Object.entries(appTags).forEach(([app, tag]) => {
-        console.log(`🔹 ${app}: ${tag}`);
+export function fnDisplayAppTags(laAppTags: Record<string, string>): void {
+    if (Object.keys(laAppTags).length > 0) {
+      Object.entries(laAppTags).forEach(([lApp, lTag]) => {
+        console.log(`🔹 ${lApp}: ${lTag}`);
       });
     }
   }
@@ -161,17 +161,17 @@ export async function fnPromptUser(lUpgradeDate: string, lDayLimit: number, lApp
     }
   
     // Fetch all tags matching the major version pattern
-    let lLastTags = execSync(`git -C ${lAppPath} tag --list "${lMajorVersion}.*"`, { encoding: 'utf-8' })
+    let laLastTags = execSync(`git -C ${lAppPath} tag --list "${lMajorVersion}.*"`, { encoding: 'utf-8' })
       .trim()
       .split('\n');
   
-    if (lLastTags.length === 0) {
+    if (laLastTags.length === 0) {
       console.log('❌ No tags found in repository.');
       process.exit(1);
     }
   
     // Find the closest tag AFTER the upgrade date
-    for (let lTag of lLastTags) {
+    for (let lTag of laLastTags) {
       let lTagDateStr = execSync(`git -C ${lAppPath} log -1 --format=%ai ${lTag}`, { encoding: 'utf-8' })
         .trim()
         .split(' ')[0];

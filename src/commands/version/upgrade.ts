@@ -9,14 +9,14 @@ import {fnExtractRequiredVersions, fnCompareVersions,
 } from '../../functions/upgrade-functions.js';
 
 export default class clVersionUpgrade extends Command {
-  static description = 'Upgrade a Release Group';
+  static sDescription = 'Upgrade a Release Group';
 
   static args = {
-    releaseGroup: Args.string({ description: 'Release group name', required: true }),
+    releaseGroup: Args.string({ sDescription: 'Release group name', required: true }),
   };
 
   static flags = {
-    date: Flags.string({ char: 'd', description: 'Upgrade date (YYYY-MM-DD)', required: true }),
+    date: Flags.string({ char: 'd', sDescription: 'Upgrade date (YYYY-MM-DD)', required: true }),
   };
 
   async run() {
@@ -89,13 +89,13 @@ export default class clVersionUpgrade extends Command {
           let lBuildEnvPath = path.join(lLensdockerPath, 'ci', 'build.env');
           let lFrappeVersion = 'Unknown';
           if (fs.existsSync(lBuildEnvPath)) {
-            let ldBuildEnvContent = fs.readFileSync(lBuildEnvPath, 'utf-8');
-            var lFrappeVersionMatch = ldBuildEnvContent.match(/^FRAPPE_VERSION=(.+)$/m);
+            let lBuildEnvContent = fs.readFileSync(lBuildEnvPath, 'utf-8');
+            var lFrappeVersionMatch = lBuildEnvContent.match(/^FRAPPE_VERSION=(.+)$/m);
             if (!lFrappeVersionMatch) {
               console.error('❌ Frappe version not found in build.env.');
               return;
             }
-            let lMatch = ldBuildEnvContent.match(/^FRAPPE_VERSION=(.+)$/m);
+            let lMatch = lBuildEnvContent.match(/^FRAPPE_VERSION=(.+)$/m);
             if (lMatch) {
               lFrappeVersion = lMatch[1];
             }
@@ -339,9 +339,9 @@ export default class clVersionUpgrade extends Command {
                 ldTagData[lAppName] = { lTag: lSelectedTag, lDate: lSelectedDate };
               } else {
                 // Call function to prompt user for action
-                let selectedTagData = await fnPromptUser(lUpgradeDate, lDayLimit, lAppPath, lMajorVersion, lAppName);
+                let lSelectedTagData = await fnPromptUser(lUpgradeDate, lDayLimit, lAppPath, lMajorVersion, lAppName);
                 // Store the selected tag
-                ldTagData[lAppName] = selectedTagData;
+                ldTagData[lAppName] = lSelectedTagData;
               }
             }  else if (lAppName === 'frappe') { // Logic for Frappe
               let lDayLimit = ldAppDayLimits[lAppName];
@@ -364,9 +364,9 @@ export default class clVersionUpgrade extends Command {
                 ldTagData[lAppName] = { lTag: lSelectedTag, lDate: lSelectedDate };
               } else {
                 // Call function to prompt user for action
-                let selectedTagData = await fnPromptUser(lUpgradeDate, lDayLimit, lAppPath, lMajorVersion, lAppName);
+                let lSelectedTagData = await fnPromptUser(lUpgradeDate, lDayLimit, lAppPath, lMajorVersion, lAppName);
                 // Store the selected tag
-                ldTagData[lAppName] = selectedTagData;
+                ldTagData[lAppName] = lSelectedTagData;
               }
             } else { // Logic for other Apps except lms, payments and lens-pdf-on-submit
                 let lDayLimit = ldAppDayLimits[lAppName];
@@ -389,9 +389,9 @@ export default class clVersionUpgrade extends Command {
                 // If no tag is selected based on the condition then the latest version of that major is selected
                 if (!lSelectedTag){
                   // Call function to prompt user for action
-                  let selectedTagData = await fnPromptUser(lUpgradeDate, lDayLimit, lAppPath, lMajorVersion, lAppName);
+                  let lSelectedTagData = await fnPromptUser(lUpgradeDate, lDayLimit, lAppPath, lMajorVersion, lAppName);
                   // Store the selected tag
-                  ldTagData[lAppName] = selectedTagData;
+                  ldTagData[lAppName] = lSelectedTagData;
                 }else {
                   ldTagData[lAppName] = { lTag: lSelectedTag, lDate: lSelectedDate };
                 }
@@ -447,9 +447,9 @@ export default class clVersionUpgrade extends Command {
                 ldTagData[lAppName] = { lTag: lSelectedTag, lDate: lSelectedDate.toISOString() };
             } else {
               // Call function to prompt user for action
-              let selectedTagData = await fnPromptUser(lUpgradeDate, lDayLimit, lAppPath, lMajorVersion, lAppName);
+              let lSelectedTagData = await fnPromptUser(lUpgradeDate, lDayLimit, lAppPath, lMajorVersion, lAppName);
               // Store the selected tag
-              ldTagData[lAppName] = selectedTagData;
+              ldTagData[lAppName] = lSelectedTagData;
             }
           }
         }
