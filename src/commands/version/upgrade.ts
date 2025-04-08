@@ -8,18 +8,23 @@ import { fnFetchIndiaComplianceTagAndDate, fnFindERPNextTagBetweenDates,
   fnFindFrappeBasedAppTag
  } from '../../functions/upgrade-functions.js';
 
+ // Define the CLI command class
 export default class clUpgrade extends Command {
+  // description, flags, args are keywords of @oclif/core
   static description = 'Upgrade a release group';
 
+  // Usage examples for the command
   static usage = [ '[RELEASEGROUPNAME] -d=2025-06-14 --> upgrade a release group',
     '-r --> list the release groups available in the lensdocker repo' ];
 
+  // Define CLI flags
   static flags = {
     help: Flags.help({ char: 'h' }),
     releasegroup: Flags.boolean({ char: 'r', description: 'List Release Groups available' }),
     date: Flags.string({ char: 'd', description: 'Upgrade date (YYYY-MM-DD)', helpValue: '2025-06-14', }),
   };
 
+  // Define CLI arguments
   static args = {
     releaseGroupName: Args.string({ description: 'Release group name', required: false }),
   };
@@ -48,6 +53,7 @@ export default class clUpgrade extends Command {
       fs.mkdirSync(lRepositoriesPath, { recursive: true });
     }
 
+    // If --date flag is provided, proceed to upgrade logic
     if (flags.date) {
       // If --date is used, ensure releasegroupName is provided
       if (!args.releaseGroupName) {
@@ -59,7 +65,7 @@ export default class clUpgrade extends Command {
       // Get the apps for the specified releasegroup.
       const LaAppList = fnFetchAppNamesFromReleaseGroup(args.releaseGroupName);
       var ldAppTagMap: { [lApp: string]: { lTag: string; lDate: string } } = {};
-      // ✅ Use inquirer to select version with arrow keys
+      // Use inquirer to select version with arrow keys
       const { LSelectedVersion } = await inquirer.prompt([
         {
           type: 'list',
@@ -68,12 +74,10 @@ export default class clUpgrade extends Command {
           choices: ['v14', 'v15'],
         },
       ]);
-      var lFrappeVersion
-      var lERPNextVersion
-      var lIndiaComplianceDate
-      var lErpnextDate
-      var lFrappeDate
-      // 🔹 Call the function & display results
+      // Initialize variables for different app versions and tag dates
+      var lFrappeVersion, lERPNextVersion, lIndiaComplianceDate, lErpnextDate, lFrappeDate;
+
+      // Get tag/date info for india-compliance and determine required versions
       const LdResult = await fnFetchIndiaComplianceTagAndDate(flags.date, LSelectedVersion, args.releaseGroupName);
       if (LdResult) {
         lFrappeVersion = LdResult.LdRequiredVersions['Frappe'];
@@ -81,12 +85,14 @@ export default class clUpgrade extends Command {
         lIndiaComplianceDate = LdResult.lSelectedDate;
       }
 
+      // Save india-compliance tag info if available
       if (LdResult?.lSelectedTag && LdResult.lSelectedDate !== null) {
         ldAppTagMap['india-compliance'] = {
           lTag: LdResult.lSelectedTag,
           lDate: LdResult.lSelectedDate,
         };
       }
+      // Find ERPNext tag between selected upgrade date and india-compliance tag date
       if (flags.date && LSelectedVersion && lERPNextVersion && lIndiaComplianceDate) {
         const LdResult = await fnFindERPNextTagBetweenDates(flags.date, LSelectedVersion, lERPNextVersion, lIndiaComplianceDate);
         if (LdResult) {
@@ -97,6 +103,7 @@ export default class clUpgrade extends Command {
           };
         }
       }
+      // Find Frappe tag before ERPNext release date
       if (LSelectedVersion && lFrappeVersion && lErpnextDate) {
         const LdResult = await fnFindFrappeTagBeforeERPNextDate(lErpnextDate, LSelectedVersion, lFrappeVersion);
         if (LdResult) {
@@ -108,6 +115,7 @@ export default class clUpgrade extends Command {
         }
      }
      
+      // Loop through all apps (excluding core ones) and find appropriate tags
       if (lErpnextDate && lFrappeDate && LSelectedVersion && LaAppList?.length) {
         for (let lApp of LaAppList) {
           if (lApp === 'frappe' || lApp === 'erpnext' || lApp === 'india-compliance') continue; // Skip frappe
