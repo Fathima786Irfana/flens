@@ -234,6 +234,7 @@ export async function fnFetchIndiaComplianceTagAndDate(iDate: string, iSelectedV
     }
 
     // 🔹 6. Parse check_version_compatibility.py file for required versions
+    execSync(`git -C ${LTempDir} checkout ${lSelectedTag}`, { stdio: 'ignore' });
     let lPyFilePath = path.join(LTempDir, 'india_compliance/patches/check_version_compatibility.py');
     let lContent = fs.readFileSync(lPyFilePath, 'utf-8');
   
@@ -257,6 +258,7 @@ export async function fnFetchIndiaComplianceTagAndDate(iDate: string, iSelectedV
             LdRequiredVersions[lAppName] = laVersionsDict[lRequiredVersionKey];
         }
     }
+    execSync(`git -C ${LTempDir} checkout develop`, { stdio: 'ignore' });
     // 🔹 Return final tag info and version mapping
     return { lSelectedTag, lSelectedDate, LdRequiredVersions };
   } catch (error: unknown) {
@@ -285,7 +287,6 @@ export async function fnFindERPNextTagBetweenDates(
   const LLocalPath = path.join(LRepositoriesPath, 'erpnext');
   const LUserDate = new Date(iFlagsDate);
   const LComplianceDate = new Date(iIndiaComplianceDate);
-
   // Define date range for selecting a valid ERPNext tag
   let lStartDate: Date;
   let lEndDate: Date;
@@ -300,21 +301,18 @@ export async function fnFindERPNextTagBetweenDates(
     lStartDate = new Date(LComplianceDate);
     lStartDate.setDate(lEndDate.getDate() - 7);
   }
-
   // 🔹 Clone or update the erpnext repo
   if (!fs.existsSync(LLocalPath)) {
     execSync(`git clone ${LRepoUrl} ${LLocalPath}`, { stdio: 'ignore' });
   } else {
     execSync(`git -C ${LLocalPath} fetch --tags`, { stdio: 'ignore' });
   }
-
   // 🔹 Extract all tags matching the selected major version (e.g., v15.x.x)
   const LaTagListOutput = execSync(`git -C ${LLocalPath} tag`, { encoding: 'utf-8' });
   const LaAllTags = LaTagListOutput
     .split('\n')
     .map(lTag => lTag.trim())
     .filter(lTag => new RegExp(`^${iSelectedVersion.replace('v', 'v')}\\.\\d+\\.\\d+$`).test(lTag));
-
   // Track closest valid tag within range
   let lClosestTag: string | null = null;
   let lClosestDate: string | null = null;
