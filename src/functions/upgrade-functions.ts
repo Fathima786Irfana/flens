@@ -115,7 +115,6 @@ export function fnFetchAppNamesFromReleaseGroup(iReleaseGroupName: string): stri
   if (!LaAppNames.includes('frappe')) {
     LaAppNames.unshift('frappe');
   }
-
   return LaAppNames;
 }
 
@@ -650,14 +649,17 @@ export async function fnFindFrappeBasedAppTag(
   iFrappeDate: string,
 ): Promise<{ lTag: string; lDate: string } | null> {
   // Allow only supported Frappe-based apps
-  const LaAllowedApps = ['crm', 'frappe_whatsapp', 'insights', 'helpdesk'];
+  const LaAllowedApps = ['crm', 'frappe_whatsapp', 'insights', 'helpdesk', 'raven'];
   if (!LaAllowedApps.includes(iAppName)) return null;
 
+  // Map of custom app names to their Git repo URLs
+  const ldCustomRepoUrls: Record<string, string> = {
+    frappe_whatsapp: 'https://github.com/shridarpatil/frappe_whatsapp.git',
+    raven: 'https://github.com/The-Commit-Company/raven.git',
+  };
+
   // Determine Git repo URL based on app
-  const LRepoUrl =
-    iAppName === 'frappe_whatsapp'
-      ? 'https://github.com/shridarpatil/frappe_whatsapp.git'
-      : `https://github.com/frappe/${iAppName}.git`;
+  const LRepoUrl = ldCustomRepoUrls[iAppName] || `https://github.com/frappe/${iAppName}.git`;
 
   // Setup local path to clone or pull the repo
   const LHomeDir = process.env.HOME || process.env.USERPROFILE || '/tmp';
@@ -675,6 +677,7 @@ export async function fnFindFrappeBasedAppTag(
     insights: 20,
     frappe_whatsapp: 30,
     helpdesk: 31,
+    raven: 15,
   };
   const LDaysToAdd = ldDayMap[iAppName];
   LEndDate.setDate(LBaseDate.getDate() + LDaysToAdd);

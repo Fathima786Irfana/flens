@@ -119,7 +119,7 @@ export default class clUpgrade extends Command {
       if (lErpnextDate && lFrappeDate && LSelectedVersion && LaAppList?.length) {
         for (let lApp of LaAppList) {
           if (lApp === 'frappe' || lApp === 'erpnext' || lApp === 'india-compliance') continue; // Skip frappe
-          const LaFrappeBasedApps = ['crm', 'insights', 'frappe_whatsapp', 'helpdesk'];
+          const LaFrappeBasedApps = ['crm', 'insights', 'frappe_whatsapp', 'helpdesk', 'raven'];
           let ldTagInfo: { lTag: string; lDate: string } | null = null;
           if (LaFrappeBasedApps.includes(lApp)) {
             ldTagInfo = await fnFindFrappeBasedAppTag(lApp, lFrappeDate);
