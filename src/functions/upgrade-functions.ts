@@ -93,6 +93,7 @@ export function fnFetchAppNamesFromReleaseGroup(iReleaseGroupName: string): stri
 
   // Checkout the specified release group branch
   execSync(`git -C ${LLocalPath} checkout ${iReleaseGroupName}`, { stdio: 'ignore' });
+  execSync(`git -C ${LLocalPath} pull`, { stdio: 'ignore' });
 
   // Read apps.json
   const LAppsJsonPath = path.join(LLocalPath, 'ci', 'apps.json');
@@ -498,7 +499,13 @@ export async function fnFindAppTagAfterERPNextDate(
 
   // Handle special case for "lens_pdf-on-submit" app
   if (iAppName === 'lens_pdf-on-submit') {
-    let lTag = 'workflow-v1';
+    let lTag = 'workflow-v2';
+    return { lTag, lDate: '' };
+  }
+
+  // Handle special case for "cpq" app
+  if (iAppName === 'cpq') {
+    let lTag = 'dem0-upgrade';
     return { lTag, lDate: '' };
   }
 
