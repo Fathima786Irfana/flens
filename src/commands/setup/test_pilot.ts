@@ -1,4 +1,5 @@
 import { Command, Flags } from '@oclif/core';
+import ora from 'ora';
 import inquirer from 'inquirer';
 import { execSync } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -38,17 +39,16 @@ export default class clSetupTestPilot extends Command {
     const { flags } = await this.parse(clSetupTestPilot);
 
     const LHomeDir = os.homedir();
-    const LDefaultDir = path.join(LHomeDir, 'lens_ai_test_pilot');
     const LIsWindows = os.platform() === 'win32';
 
     // Step 1: Ask for directory confirmation
-    let lCloneDir = LDefaultDir;
+    let lCloneDir = LHomeDir;
     if (!flags.dir) {
       const { lConfirmHome } = await inquirer.prompt([
         {
           type: 'confirm',
           name: 'lConfirmHome',
-          message: `Do you want to clone lens_ai_test_pilot in ${LDefaultDir}?`,
+          message: `Do you want to clone lens_ai_test_pilot in ${LHomeDir}?`,
           default: true,
         },
       ]);
@@ -109,47 +109,68 @@ export default class clSetupTestPilot extends Command {
       },
     ]);
 
-    // Step 6, 7 & 8: Ask for API secret and key
-    const { lApiSecret, lApiKey } = await inquirer.prompt([
-      { type: 'password', name: 'lApiSecret', message: 'Enter your API Secret:' },
-      { type: 'password', name: 'lApiKey', message: 'Enter your API Key:' },
+    // Step 6: Ask if user already has a Basic Key
+    const { lHasBasicKey } = await inquirer.prompt([
+      { type: 'confirm', name: 'lHasBasicKey', message: 'Do you already have a Basic Key?', default: false },
     ]);
 
-    // Step 9: Create basic auth (base64)
-    const lAuth = Buffer.from(`${lApiSecret}:${lApiKey}`).toString('base64');
+    let lAuth: string;
+    let lFinalAuth: string;
+
+    if (lHasBasicKey) {
+      // If they already have it, just ask for it
+      const { lBasicKey } = await inquirer.prompt([
+        { type: 'password', name: 'lBasicKey', message: 'Enter your Basic Key:', mask: '*' },
+      ]);
+      lAuth = lBasicKey.trim();
+    } else {
+      // Otherwise ask for Secret + Key and generate Basic Key
+      const { lApiSecret, lApiKey } = await inquirer.prompt([
+        { type: 'password', name: 'lApiSecret', message: 'Enter your API Secret:', mask: '*' },
+        { type: 'password', name: 'lApiKey', message: 'Enter your API Key:', mask: '*' },
+      ]);
+
+      // 🚨 Trim whitespace before encoding
+      const lCleanedSecret = lApiSecret.trim();
+      const lCleanedKey = lApiKey.trim();
+
+      const lFinalAuth = Buffer.from(`${lCleanedKey}:${lCleanedSecret}`).toString('base64');
+      lAuth = `Basic ${lFinalAuth}`;
+      console.log(lAuth);
+    }
 
     // Step 10: Replace HOST_KEY and TARGET_KEY
     fs.appendFileSync(lEnvFile, `\nHOST_URL=${lHostUrl}`);
     fs.appendFileSync(lEnvFile, `\nTARGET_URL=${lHostUrl}`);
-    fs.appendFileSync(lEnvFile, `\nHOST_KEY=Basic ${lAuth}`);
-    fs.appendFileSync(lEnvFile, `\nTARGET_KEY=Basic ${lAuth}`);
+    fs.appendFileSync(lEnvFile, `\nHOST_KEY=${lAuth}`);
+    fs.appendFileSync(lEnvFile, `\nTARGET_KEY=${lAuth}`);
 
     this.log('[INFO] .env updated with keys');
 
     // Step 11: nvm use v20 (Linux/macOS) or nvm use 20 (Windows)
     try {
       if (LIsWindows) {
-        execSync('nvm use 20', { stdio: 'inherit', shell: 'cmd.exe' });
+        execSync('nvm use 20', { stdio: 'ignore', shell: 'cmd.exe' });
       } else {
-        execSync('bash -c "source $HOME/.nvm/nvm.sh && nvm use v20"', { stdio: 'inherit' });
+        execSync('bash -c "source $HOME/.nvm/nvm.sh && nvm use v20"', { stdio: 'ignore' });
       }
     } catch {
       this.error('Failed to switch to Node v20. Ensure nvm (or nvm-windows) is installed.');
     }
 
     // Step 12: npm install
+    const lSpinnerInstall = ora('Installing dependencies with npm...').start();
     try {
-      execSync('npm install', { stdio: 'inherit' });
-    } catch {
-      this.error('npm install failed.');
+      execSync('npm install', { stdio: 'ignore' });
+      lSpinnerInstall.succeed('Dependencies installed successfully');
+    } catch (err) {
+      lSpinnerInstall.fail('npm install failed');
+      this.error('Exiting due to error during npm install.');
+      return;
     }
 
     // Step 13: npm run setup
-    try {
-      execSync('npm run setup', { stdio: 'inherit' });
-    } catch {
-      this.error('npm run setup failed.');
-    }
+    execSync('npm run setup', { stdio: 'inherit' });
 
     this.log('✅ Setup completed successfully!');
   }
