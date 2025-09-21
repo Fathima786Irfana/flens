@@ -1,12 +1,12 @@
 {
-  "name": "flens",
+  "name": "@fathima786irfana/flens",
   "description": "A new CLI generated with oclif",
   "version": "0.0.0",
   "author": "Fathima786Irfana",
   "bin": {
     "flens": "./bin/run.js"
   },
-  "bugs": "https://github.com/oclif-poc/flens/issues",
+  "bugs": "https://github.com/Fathima786Irfana/flens/issues",
   "dependencies": {
     "@oclif/core": "^4",
     "@oclif/plugin-help": "^6",
@@ -47,7 +47,10 @@
     "./dist",
     "./oclif.manifest.json"
   ],
-  "homepage": "https://github.com/oclif-poc/flens",
+  "homepage": "https://github.com/Fathima786Irfana/flens",
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
   "keywords": [
     "oclif"
   ],
@@ -69,7 +72,7 @@
       }
     }
   },
-  "repository": "oclif-poc/flens",
+  "repository": "Fathima786Irfana/flens",
   "scripts": {
     "build": "shx rm -rf dist && tsc -b",
     "lint": "eslint",
