@@ -16,11 +16,11 @@ A new CLI generated with oclif
 # Usage
 <!-- usage -->
 ```sh-session
-$ npm install -g flens
+$ npm install -g @fathima786irfana/flens
 $ flens COMMAND
 running command...
 $ flens (--version)
-flens/0.0.0 linux-x64 node-v20.13.1
+@fathima786irfana/flens/1.0.0 linux-x64 node-v20.19.5
 $ flens --help [COMMAND]
 USAGE
   $ flens COMMAND
@@ -29,9 +29,12 @@ USAGE
 <!-- usagestop -->
 # Commands
 <!-- commands -->
+* [`flens create pr`](#flens-create-pr)
+* [`flens gitflow reminder`](#flens-gitflow-reminder)
 * [`flens hello PERSON`](#flens-hello-person)
 * [`flens hello world`](#flens-hello-world)
 * [`flens help [COMMAND]`](#flens-help-command)
+* [`flens nectar open-project`](#flens-nectar-open-project)
 * [`flens plugins`](#flens-plugins)
 * [`flens plugins add PLUGIN`](#flens-plugins-add-plugin)
 * [`flens plugins:inspect PLUGIN...`](#flens-pluginsinspect-plugin)
@@ -42,6 +45,43 @@ USAGE
 * [`flens plugins uninstall [PLUGIN]`](#flens-plugins-uninstall-plugin)
 * [`flens plugins unlink [PLUGIN]`](#flens-plugins-unlink-plugin)
 * [`flens plugins update`](#flens-plugins-update)
+* [`flens project clear-use`](#flens-project-clear-use)
+* [`flens project create`](#flens-project-create)
+* [`flens project delete`](#flens-project-delete)
+* [`flens project edit`](#flens-project-edit)
+* [`flens project list`](#flens-project-list)
+* [`flens project use`](#flens-project-use)
+* [`flens project view`](#flens-project-view)
+* [`flens repo check-hygiene`](#flens-repo-check-hygiene)
+* [`flens repo init`](#flens-repo-init)
+* [`flens repo sync`](#flens-repo-sync)
+* [`flens setup test_pilot`](#flens-setup-test_pilot)
+* [`flens test srt`](#flens-test-srt)
+* [`flens [RELEASEGROUPNAME] -d=2025-06-14 --> upgrade a release group`](#flens-releasegroupname--d2025-06-14----upgrade-a-release-group)
+* [`flens version upgrade-ref RELEASEGROUP`](#flens-version-upgrade-ref-releasegroup)
+
+## `flens create pr`
+
+```
+USAGE
+  $ flens create pr
+```
+
+_See code: [src/commands/create/pr.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/create/pr.ts)_
+
+## `flens gitflow reminder`
+
+Run GitFlow reminder job in background
+
+```
+USAGE
+  $ flens gitflow reminder
+
+DESCRIPTION
+  Run GitFlow reminder job in background
+```
+
+_See code: [src/commands/gitflow/reminder.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/gitflow/reminder.ts)_
 
 ## `flens hello PERSON`
 
@@ -65,7 +105,7 @@ EXAMPLES
   hello friend from oclif! (./src/commands/hello/index.ts)
 ```
 
-_See code: [src/commands/hello/index.ts](https://github.com/oclif-poc/flens/blob/v0.0.0/src/commands/hello/index.ts)_
+_See code: [src/commands/hello/index.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/hello/index.ts)_
 
 ## `flens hello world`
 
@@ -83,7 +123,7 @@ EXAMPLES
   hello world! (./src/commands/hello/world.ts)
 ```
 
-_See code: [src/commands/hello/world.ts](https://github.com/oclif-poc/flens/blob/v0.0.0/src/commands/hello/world.ts)_
+_See code: [src/commands/hello/world.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/hello/world.ts)_
 
 ## `flens help [COMMAND]`
 
@@ -104,6 +144,20 @@ DESCRIPTION
 ```
 
 _See code: [@oclif/plugin-help](https://github.com/oclif/plugin-help/blob/v6.2.25/src/commands/help.ts)_
+
+## `flens nectar open-project`
+
+Get all open projects from nectar and display them as a select list
+
+```
+USAGE
+  $ flens nectar open-project
+
+DESCRIPTION
+  Get all open projects from nectar and display them as a select list
+```
+
+_See code: [src/commands/nectar/open-project.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/nectar/open-project.ts)_
 
 ## `flens plugins`
 
@@ -394,4 +448,216 @@ DESCRIPTION
 ```
 
 _See code: [@oclif/plugin-plugins](https://github.com/oclif/plugin-plugins/blob/v5.4.31/src/commands/plugins/update.ts)_
+
+## `flens project clear-use`
+
+Clear the currently active project with confirmation
+
+```
+USAGE
+  $ flens project clear-use
+
+DESCRIPTION
+  Clear the currently active project with confirmation
+```
+
+_See code: [src/commands/project/clear-use.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/project/clear-use.ts)_
+
+## `flens project create`
+
+Creates a new project by storing repo details securely in JSON
+
+```
+USAGE
+  $ flens project create
+
+DESCRIPTION
+  Creates a new project by storing repo details securely in JSON
+```
+
+_See code: [src/commands/project/create.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/project/create.ts)_
+
+## `flens project delete`
+
+Deletes a project
+
+```
+USAGE
+  $ flens project delete
+
+DESCRIPTION
+  Deletes a project
+```
+
+_See code: [src/commands/project/delete.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/project/delete.ts)_
+
+## `flens project edit`
+
+Edit an existing project
+
+```
+USAGE
+  $ flens project edit
+
+DESCRIPTION
+  Edit an existing project
+```
+
+_See code: [src/commands/project/edit.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/project/edit.ts)_
+
+## `flens project list`
+
+Lists all projects stored in the projects folder
+
+```
+USAGE
+  $ flens project list
+
+DESCRIPTION
+  Lists all projects stored in the projects folder
+```
+
+_See code: [src/commands/project/list.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/project/list.ts)_
+
+## `flens project use`
+
+Select and set an active project
+
+```
+USAGE
+  $ flens project use
+
+DESCRIPTION
+  Select and set an active project
+```
+
+_See code: [src/commands/project/use.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/project/use.ts)_
+
+## `flens project view`
+
+View details of a selected project. Sensitive data (Git token, API key) will be masked.
+
+```
+USAGE
+  $ flens project view
+
+DESCRIPTION
+  View details of a selected project. Sensitive data (Git token, API key) will be masked.
+```
+
+_See code: [src/commands/project/view.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/project/view.ts)_
+
+## `flens repo check-hygiene`
+
+Check whether local IDE is in sync with the local LENS instance.
+
+```
+USAGE
+  $ flens repo check-hygiene [-h]
+
+FLAGS
+  -h, --help  Show CLI help.
+
+DESCRIPTION
+  Check whether local IDE is in sync with the local LENS instance.
+```
+
+_See code: [src/commands/repo/check-hygiene.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/repo/check-hygiene.ts)_
+
+## `flens repo init`
+
+Initialize a repository based on details from the Instance using API call
+
+```
+USAGE
+  $ flens repo init
+
+DESCRIPTION
+  Initialize a repository based on details from the Instance using API call
+```
+
+_See code: [src/commands/repo/init.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/repo/init.ts)_
+
+## `flens repo sync`
+
+Syncs Repo with Host
+
+```
+USAGE
+  $ flens repo sync [-h]
+
+FLAGS
+  -h, --help  Show CLI help.
+
+DESCRIPTION
+  Syncs Repo with Host
+```
+
+_See code: [src/commands/repo/sync.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/repo/sync.ts)_
+
+## `flens setup test_pilot`
+
+Setup the Lens AI Test Pilot project in your environment
+
+```
+USAGE
+  $ flens setup test_pilot [-d <value>]
+
+FLAGS
+  -d, --dir=<value>  Optional directory name (defaults to ~/lens_ai_test_pilot)
+
+DESCRIPTION
+  Setup the Lens AI Test Pilot project in your environment
+
+EXAMPLES
+  $ lenscloud setup test_pilot
+
+  $ lenscloud setup test_pilot --dir custom_pilot
+```
+
+_See code: [src/commands/setup/test_pilot.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/setup/test_pilot.ts)_
+
+## `flens test srt`
+
+```
+USAGE
+  $ flens test srt
+```
+
+_See code: [src/commands/test/srt.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/test/srt.ts)_
+
+## `flens [RELEASEGROUPNAME] -d=2025-06-14 --> upgrade a release group`
+
+Upgrade a release group
+
+```
+USAGE
+  $ flens version upgrade [RELEASEGROUPNAME] -d=2025-06-14 --> upgrade a release group
+  $ flens version upgrade -r --> list the release groups available in the lensdocker repo
+
+ARGUMENTS
+  RELEASEGROUPNAME  Release group name
+
+FLAGS
+  -d, --date=2025-06-14  Upgrade date (YYYY-MM-DD)
+  -h, --help             Show CLI help.
+  -r, --releasegroup     List Release Groups available
+
+DESCRIPTION
+  Upgrade a release group
+```
+
+_See code: [src/commands/version/upgrade.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/version/upgrade.ts)_
+
+## `flens version upgrade-ref RELEASEGROUP`
+
+```
+USAGE
+  $ flens version upgrade-ref RELEASEGROUP -d <value>
+
+FLAGS
+  -d, --date=<value>  (required)
+```
+
+_See code: [src/commands/version/upgrade-ref.ts](https://github.com/Fathima786Irfana/flens/blob/v1.0.0/src/commands/version/upgrade-ref.ts)_
 <!-- commandsstop -->

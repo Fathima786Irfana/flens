@@ -1,7 +1,7 @@
 {
   "name": "@fathima786irfana/flens",
   "description": "A new CLI generated with oclif",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "author": "Fathima786Irfana",
   "bin": {
     "flens": "./bin/run.js"
