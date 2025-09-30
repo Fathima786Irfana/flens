@@ -505,7 +505,13 @@ export async function fnFindAppTagAfterERPNextDate(
 
   // Handle special case for "cpq" app
   if (iAppName === 'cpq') {
-    let lTag = 'dem0-upgrade';
+    let lTag = 'demo-upgrade';
+    return { lTag, lDate: '' };
+  }
+
+  // Handle special case for "webshop" app
+  if (iAppName === 'webshop') {
+    let lTag = 'version-15';
     return { lTag, lDate: '' };
   }
 

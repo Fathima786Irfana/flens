@@ -135,7 +135,7 @@ export default class clUpgrade extends Command {
         }
       }
       // Display the tags and its date for the respective apps
-      console.log("\nUpgrate App Tags : \n")
+      console.log("\nUpgrade App Tags : \n")
       for (let lApp of LaAppList) {
         const LdInfo = ldAppTagMap[lApp];
         if (LdInfo) {
