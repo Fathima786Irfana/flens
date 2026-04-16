@@ -767,3 +767,128 @@ export async function fnFindFrappeBasedAppTag(
   }
   return null;
 }
+
+function fnGetAllPythonFiles(iDir: string): string[] {
+  let lResults: string[] = [];
+
+  if (!fs.existsSync(iDir)) return lResults;
+
+  const LaList = fs.readdirSync(iDir);
+
+  for (let lFile of LaList) {
+    const LFullPath = path.join(iDir, lFile);
+    const LStat = fs.statSync(LFullPath);
+
+    if (LStat.isDirectory()) {
+      lResults = lResults.concat(fnGetAllPythonFiles(LFullPath));
+    } else if (lFile.endsWith('.py')) {
+      lResults.push(LFullPath);
+    }
+  }
+
+  return lResults;
+}
+
+function fnExtractDependenciesFromFile(iContent: string): string[] {
+  const LaDeps: string[] = [];
+
+  const LRegex = /install_app\(\s*["']([\w_-]+)["']\s*\)/g;
+
+  let lMatch;
+  while ((lMatch = LRegex.exec(iContent)) !== null) {
+    const LAppName = lMatch[1];
+    if (LAppName && LAppName.trim()) {
+      LaDeps.push(LAppName.trim());
+    }
+  }
+
+  return LaDeps;
+}
+
+function fnResolveRepoUrl(iAppName: string): string {
+  const LdCustomRepos: Record<string, string> = {
+    'india-compliance': 'https://github.com/resilient-tech/india-compliance.git',
+    frappe_whatsapp: 'https://github.com/shridarpatil/frappe_whatsapp.git',
+    raven: 'https://github.com/The-Commit-Company/raven.git',
+    cpq: 'https://github.com/lmnaslimited/cpq.git',
+    'lens_pdf-on-submit': 'https://github.com/lmnaslimited/lens_pdf-on-submit.git'
+  };
+
+  return LdCustomRepos[iAppName] || `https://github.com/frappe/${iAppName}.git`;
+}
+
+function fnResolveAppFolder(iAppName: string): string {
+  const LdAppFolderMap: Record<string, string> = {
+    cpq: 'crm',
+    'lens_pdf-on-submit': 'pdf-on-submit'
+  };
+
+  return LdAppFolderMap[iAppName] || iAppName;
+}
+
+export async function fnValidatePatchDependencies(iAppTagMap: any, iAppList: any) {
+  const LHomeDir = process.env.HOME || '/tmp';
+  const LTempBase = path.join(LHomeDir, 'flens-temps');
+
+  let ldMissingDeps: Record<string, string[]> = {};
+
+  for (let lApp of Object.keys(iAppTagMap)) {
+    const { lTag } = iAppTagMap[lApp];
+
+    const LRepoUrl = fnResolveRepoUrl(lApp);
+    const LRepoPath = path.join(LTempBase, lApp);
+
+    if (fs.existsSync(LRepoPath)) {
+      fs.rmSync(LRepoPath, { recursive: true, force: true });
+    }
+
+    try {
+      execSync(`git clone --no-single-branch ${LRepoUrl} ${LRepoPath}`, { stdio: 'ignore' });
+      execSync(`git -C ${LRepoPath} checkout ${lTag}`, { stdio: 'ignore' });
+    } catch (err) {
+      console.log(`❌ Failed to checkout ${lTag} for ${lApp}`);
+      continue;
+    }
+
+    const lAppFolder = fnResolveAppFolder(lApp);
+    const LPatchesPath = path.join(LRepoPath, lAppFolder, 'patches');
+
+    if (!fs.existsSync(LPatchesPath)) continue;
+
+    // recursive scan
+    const pyFiles = fnGetAllPythonFiles(LPatchesPath);
+
+    for (let filePath of pyFiles) {
+      const content = fs.readFileSync(filePath, 'utf-8');
+
+      const deps = fnExtractDependenciesFromFile(content);
+
+      for (let dep of deps) {
+        if (
+          dep !== 'frappe' &&
+          dep !== 'erpnext' &&
+          !iAppList.includes(dep)
+        ) {
+          if (!ldMissingDeps[lApp]) ldMissingDeps[lApp] = [];
+
+          if (!ldMissingDeps[lApp].includes(dep)) {
+            ldMissingDeps[lApp].push(dep);
+          }
+        }
+      }
+    }
+  }
+
+  // Output only (no prompt as per your requirement)
+  if (Object.keys(ldMissingDeps).length > 0) {
+    console.log('\n⚠️ Missing Patch Dependencies:\n');
+
+    for (let app in ldMissingDeps) {
+      console.log(`📦 ${app} ➜ Missing: ${ldMissingDeps[app].join(', ')}`);
+    }
+  } else {
+    console.log('\n✅ No missing patch dependencies found.');
+  }
+
+  return ldMissingDeps;
+}

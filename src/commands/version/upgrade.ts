@@ -5,7 +5,7 @@ import * as path from 'path';
 import inquirer from 'inquirer';
 import { fnFetchIndiaComplianceTagAndDate, fnFindERPNextTagBetweenDates,
   fnFetchAppNamesFromReleaseGroup, fnFindFrappeTagBeforeERPNextDate, fnFindAppTagAfterERPNextDate,
-  fnFindFrappeBasedAppTag
+  fnFindFrappeBasedAppTag, fnValidatePatchDependencies
  } from '../../functions/upgrade-functions.js';
 
  // Define the CLI command class
@@ -134,6 +134,7 @@ export default class clUpgrade extends Command {
           }
         }
       }
+      await fnValidatePatchDependencies(ldAppTagMap, LaAppList);
       // Display the tags and its date for the respective apps
       console.log("\nUpgrade App Tags : \n")
       for (let lApp of LaAppList) {
