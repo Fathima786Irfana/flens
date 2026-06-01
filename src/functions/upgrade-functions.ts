@@ -515,6 +515,12 @@ export async function fnFindAppTagAfterERPNextDate(
     return { lTag, lDate: '' };
   }
 
+  // Handle special case for "telephony" app
+  if (iAppName === 'telephony') {
+    let lTag = 'develop';
+    return { lTag, lDate: '' };
+  }
+
   // Main logic for LMS app
   if (iAppName === 'lms') {
     // Get list of all tags
@@ -838,12 +844,12 @@ export async function fnValidatePatchDependencies(iAppTagMap: any, iAppList: any
     const LRepoUrl = fnResolveRepoUrl(lApp);
     const LRepoPath = path.join(LTempBase, lApp);
 
-    if (fs.existsSync(LRepoPath)) {
-      fs.rmSync(LRepoPath, { recursive: true, force: true });
-    }
+    // if (fs.existsSync(LRepoPath)) {
+    //   fs.rmSync(LRepoPath, { recursive: true, force: true });
+    // }
 
     try {
-      execSync(`git clone --no-single-branch ${LRepoUrl} ${LRepoPath}`, { stdio: 'ignore' });
+      // execSync(`git clone --no-single-branch ${LRepoUrl} ${LRepoPath}`, { stdio: 'ignore' });
       execSync(`git -C ${LRepoPath} checkout ${lTag}`, { stdio: 'ignore' });
     } catch (err) {
       console.log(`❌ Failed to checkout ${lTag} for ${lApp}`);
